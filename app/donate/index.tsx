@@ -61,7 +61,8 @@ export default function Donate() {
       ) : (
         <FlatList
           data={types}
-          keyExtractor={(item) => item.id}
+          // keyExtractor={(item) => item.id}
+          keyExtractor={(item, index) => item?.id?.toString() ?? index.toString()}
           numColumns={screenWidth > 768 ? 3 : screenWidth > 480 ? 2 : 1} // ✅ responsive: 1 col mobile, 2 col small tab, 3 col large tab
           columnWrapperStyle={
             screenWidth > 480 ? { justifyContent: "space-around" } : undefined

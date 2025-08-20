@@ -10,7 +10,7 @@ import {
 } from 'react-native'
 import Swiper from 'react-native-swiper'
 // import { apiCmsHomeSlider, apiGetTrusts } from "../services/api";
-import { apiCmsHomeSlider, apiGetTrusts } from '@/src/services/api'
+import { apiGetTrusts } from '@/src/services/api'
 import { FontAwesome } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -28,7 +28,7 @@ type Trust = {
 }
 
 export default function HomeScreen() {
-  const [sliders, setSliders] = useState<any[]>([])
+  // const [sliders, setSliders] = useState<any[]>([])
   const [isSliderLoading, setIsSliderLoading] = useState(true)
 
   const [trustData, setTrustData] = useState<Trust[]>([])
@@ -38,22 +38,22 @@ export default function HomeScreen() {
   const [isTestimonialLoading, setIsTestimonialLoading] = useState(true)
 
   useEffect(() => {
-    fetchSliders()
+    // fetchSliders()
     fetchTrusts()
     fetchTestimonials()
   }, [])
 
-  const fetchSliders = async () => {
-    try {
-      setIsSliderLoading(true)
-      const res = await apiCmsHomeSlider('home_main')
-      setSliders(res.data?.slides || [])
-    } catch (err) {
-      console.error('Slider API Error', err)
-    } finally {
-      setIsSliderLoading(false)
-    }
-  }
+  // const fetchSliders = async () => {
+  //   try {
+  //     setIsSliderLoading(true)
+  //     const res = await apiCmsHomeSlider('home_main')
+  //     setSliders(res.data?.slides || [])
+  //   } catch (err) {
+  //     console.error('Slider API Error', err)
+  //   } finally {
+  //     setIsSliderLoading(false)
+  //   }
+  // }
 
   const fetchTrusts = async () => {
     try {

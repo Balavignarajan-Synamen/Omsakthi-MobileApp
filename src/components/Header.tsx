@@ -1,6 +1,7 @@
 // src/components/HeaderSections.tsx
 import { FontAwesome } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { Link } from "expo-router";
 import React, { useState } from "react";
 import {
   Image,
@@ -61,8 +62,11 @@ export function HeaderLogoBar() {
       end={{ x: 1, y: 1 }}
       style={styles.logoContainer}
     >
+            <Link href='/' asChild>
+      
       <Image
         source={require("../../assets/images/logoacmec-footer.png")}
+        
         style={{
           width: isTablet ? width * 0.6 : width * 0.8,
           height: isTablet ? 70 : 50,
@@ -70,6 +74,8 @@ export function HeaderLogoBar() {
         }}
         resizeMode="contain"
       />
+      </Link>
+
     </LinearGradient>
   );
 }

@@ -23,3 +23,32 @@ export function handleApiErrors(err: any): string | null {
 
   return "Something went wrong. Please try again.";
 }
+
+// ✅ Clean API request data (remove null/empty values)
+export function cleanApiReq(data: Record<string, any>) {
+  return Object.entries(data)
+    .filter(([_, value]) => value !== null && value !== "")
+    .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
+}
+
+// ✅ Convert query params to string (handles arrays also)
+export function toApiParams(queryParams: Record<string, any>): string {
+  let queryString = "?";
+
+  for (const key in queryParams) {
+    const value = queryParams[key];
+    if (value !== null && value !== undefined && value !== "") {
+      if (Array.isArray(value)) {
+        value.forEach((v) => {
+          queryString += `${encodeURIComponent(key)}[]=${encodeURIComponent(v)}&`;
+        });
+      } else {
+        queryString += `${encodeURIComponent(key)}=${encodeURIComponent(value)}&`;
+      }
+    }
+  }
+
+  // remove last "&"
+  return queryString.endsWith("&") ? queryString.slice(0, -1) : queryString;
+}
+
