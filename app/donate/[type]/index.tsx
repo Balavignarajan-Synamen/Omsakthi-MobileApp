@@ -1,3 +1,4 @@
+import Breadcrumb from '@/src/components/breadcrumb';
 import { useAuth } from '@/src/context/auth-context';
 import { apiCreateDonations, apiDonationTypeBySlug, apiGetCountries, apiGetReceipt, apiGetStates, apiRazorpayCreate, apiUserProfile, apiUserRegister } from '@/src/services/api';
 import { handleApiErrors } from '@/src/utils/helper/api.helper';
@@ -9,16 +10,16 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
 import { Controller, useFieldArray, useForm } from 'react-hook-form';
 import {
-    ActivityIndicator,
-    Alert,
-    Modal,
-    Platform,
-    ScrollView,
-    Switch,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Platform,
+  ScrollView,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DonateCheckout from './checkout';
@@ -369,12 +370,18 @@ useEffect(() => {
         }));
     }
 
-    const formatDateToYMD = (date: any): string => {
-      const year = date?.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      return `${year}/${month}/${day}`;
-    };
+  const formatDateToYMD = (date: any): string => {
+  if (!date) return "";
+
+  const d = date instanceof Date ? date : new Date(date);
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+
+  return `${year}/${month}/${day}`;
+};
+
 
     if (typeContent?.has_dates && typeContent?.date_list) {
       const dates = Array.isArray(data.date) ? data.date : [data.date];
@@ -643,21 +650,28 @@ useEffect(() => {
 
   if (screenType === "checkout") {
     return (
+      <>
+                <Breadcrumb breadcrumb={breadcrumb} />
+      
       <DonateCheckout 
         donationInfo={donationInfo} 
         setIsCheckoutLoading={setIsCheckoutLoading} 
         isCheckoutLoading={isCheckoutLoading} 
         payRazorpay={payRazorpay} 
-      />
+        />
+        </>
     );
   }
 
   if (screenType === "receipt") {
     return (
+      <>
+                <Breadcrumb breadcrumb={breadcrumb} />
       <DonateReceipt 
         isGetReceiptLoading={isReceiptLoading} 
         getDonationReceipt={getDonationReceipt} 
-      />
+        />
+        </>
     );
   }
 

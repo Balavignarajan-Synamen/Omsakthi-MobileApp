@@ -22,3 +22,10 @@ omsakthi-mobileapp/
 ├─ tsconfig.json
 ├─ app.json
 └─ package.json
+
+
+-----------------------------------------------------
+-----------------------------------------------------
+**Issues**
+1. DAte in form 
+2. state and country dropdown design

@@ -5,6 +5,7 @@ import { Link } from "expo-router";
 import React, { useState } from "react";
 import {
   Image,
+  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -62,19 +63,20 @@ export function HeaderLogoBar() {
       end={{ x: 1, y: 1 }}
       style={styles.logoContainer}
     >
-            <Link href='/' asChild>
-      
-      <Image
-        source={require("../../assets/images/logoacmec-footer.png")}
-        
-        style={{
-          width: isTablet ? width * 0.6 : width * 0.8,
-          height: isTablet ? 70 : 50,
-          alignSelf: "center",
-        }}
-        resizeMode="contain"
-      />
-      </Link>
+<Link href="/" asChild>
+  <Pressable>
+    <Image
+      source={require("../../assets/images/logoacmec-footer.png")}
+      style={{
+        width: isTablet ? width * 0.6 : width * 0.8,
+        height: isTablet ? 70 : 50,
+        alignSelf: "center",
+      }}
+      resizeMode="contain"
+    />
+  </Pressable>
+</Link>
+
 
     </LinearGradient>
   );
