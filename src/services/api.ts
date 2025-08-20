@@ -29,3 +29,8 @@ export const apiCmsHomeSlider = (code: string) => {
 export const apiGetTrusts = () => {
   return axiosInstance.get(`/api/trust`);
 };
+
+export const apiDonationTypes = (id: any) => {
+    const queryParams = getQueryParamsFromObject(id);
+    return axiosInstance.get(`/api/donation-types${queryParams}`);
+};

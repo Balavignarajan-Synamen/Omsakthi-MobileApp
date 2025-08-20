@@ -1,26 +1,40 @@
-import Footer from '@/src/components/Footer'
-import Header from '@/src/components/Header'
-import { Stack } from 'expo-router'
-import { View } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import '../global.css'
+// app/_layout.tsx
+import { Slot } from "expo-router";
+import React from "react";
+import { ScrollView, View } from "react-native";
+import "../global.css";
 
-export default function Layout() {
+import {
+  HeaderFollowBar,
+  HeaderLogoBar,
+  HeaderProfileBar,
+} from "@/src/components/Header";
+// import { HeaderFollowBar } from "";
+
+import Footer from "@/src/components/Footer";
+
+export default function RootLayout() {
   return (
-    <SafeAreaView
-      className="h-auto flex-1 bg-[#FD580B1F]"
-      edges={['left', 'right', 'bottom']}
-    >
-      {/* Header - placed at top */}
-      <Header />
+    <View style={{ flex: 1, backgroundColor: "#FD580B1F" /* same as web */ }}>
+      <ScrollView
+        // Make only the Profile bar sticky (index 2 of children below)
+        stickyHeaderIndices={[2]}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ flexGrow: 1 }}
+      >
+        {/* Header pieces */}
+        <HeaderFollowBar />
+        <HeaderLogoBar />
+        <HeaderProfileBar />
 
-      {/* Main content area */}
-      <View className="flex-1 ">
-        <Stack screenOptions={{ headerShown: false }} />
-      </View>
+        {/* Main content rendered by current route */}
+        <View style={{ flex: 1 }}>
+          <Slot />
+        </View>
 
-      {/* Footer - placed at bottom */}
-      <Footer />
-    </SafeAreaView>
-  )
+        {/* Footer (NOT sticky) */}
+        <Footer />
+      </ScrollView>
+    </View>
+  );
 }

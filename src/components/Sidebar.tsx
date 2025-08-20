@@ -1,169 +1,134 @@
-import { FontAwesome } from "@expo/vector-icons";
-import React from 'react';
+import React from "react";
 import {
-    Animated,
-    Dimensions,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
-} from 'react-native';
+  Dimensions,
+  Modal,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
-interface SidebarProps {
+const { width, height } = Dimensions.get("window");
+
+type Props = {
   isVisible: boolean;
   onClose: () => void;
   onLogin: () => void;
   onSignup: () => void;
-}
+};
 
-const Sidebar: React.FC<SidebarProps> = ({ isVisible, onClose, onLogin, onSignup }) => {
-  const { width } = Dimensions.get('window');
-  const isTablet = width >= 768;
-  const sidebarWidth = isTablet ? width * 0.4 : width * 0.8;
-
-  // Animation for sidebar
-  const translateX = new Animated.Value(sidebarWidth);
-
-  React.useEffect(() => {
-    if (isVisible) {
-      Animated.timing(translateX, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      Animated.timing(translateX, {
-        toValue: sidebarWidth,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [isVisible]);
-
-  if (!isVisible) return null;
-
+export default function Sidebar({ isVisible, onClose, onLogin, onSignup }: Props) {
   return (
-    <>
-      {/* Overlay */}
+    <Modal
+      visible={isVisible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
+      {/* Overlay background */}
       <TouchableOpacity 
         style={styles.overlay} 
         activeOpacity={1}
         onPress={onClose}
-      />
-      
-      {/* Sidebar */}
-      <Animated.View 
-        style={[
-          styles.sidebar, 
-          { 
-            width: sidebarWidth,
-            transform: [{ translateX }]
-          }
-        ]}
       >
-        {/* Top Section */}
-        <View style={styles.topSection}>
-          <Text style={styles.menuTitle}>Menu</Text>
-          <TouchableOpacity onPress={onClose}>
-            <FontAwesome name="close" size={24} color="black" />
-          </TouchableOpacity>
+        {/* Sidebar panel */}
+        <View style={styles.sidebar}>
+          {/* Header section with title and close button */}
+          <View style={styles.header}>
+            <Text style={styles.title}>Menu</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Text style={[styles.itemText, { color: "red" }]}>Close</Text>
+            </TouchableOpacity>
+          </View>
+
+         
+          
+          {/* Bottom Section */}
+          <View style={styles.bottomSection}>
+            <TouchableOpacity 
+              style={styles.authButton}
+              onPress={onLogin}
+            >
+              <Text style={styles.authButtonText1}>Login</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.authButton, styles.signupButton]}
+              onPress={onSignup}
+            >
+              <Text style={styles.authButtonText2}>Register</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-        
-        
-        {/* Bottom Section */}
-        <View style={styles.bottomSection}>
-          <TouchableOpacity 
-            style={styles.authButton}
-            onPress={onLogin}
-          >
-            <Text style={styles.authButtonText1}>Login</Text>
-          </TouchableOpacity>
-         <TouchableOpacity 
-            style={[styles.authButton, styles.signupButton]}
-            onPress={onSignup}
-          >
-            <Text style={styles.authButtonText2}>Register</Text>
-          </TouchableOpacity>
-        </View>
-      </Animated.View>
-    </>
+      </TouchableOpacity>
+    </Modal>
   );
-};
+}
 
 const styles = StyleSheet.create({
   overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    zIndex: 100,
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
   },
   sidebar: {
-    position: 'absolute',
+    width: width * 0.7,
+    backgroundColor: "#fff",
+    padding: 20,
+    position: "absolute",
     right: 0,
     top: 0,
     bottom: 0,
-    backgroundColor: '#fff',
-    zIndex: 101,
-    padding: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.3,
+    shadowOffset: { width: -2, height: 0 },
+    shadowRadius: 6,
+    elevation: 10,
+    justifyContent: "space-between",
   },
-  topSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingBottom: 20,
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  content: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: "bold",
+  },
+  item: {
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#555',
-    marginTop: 30,
+    borderBottomColor: "#f0f0f0",
   },
-  menuTitle: {
-    // color: 'white',
-    fontSize: 24,
-    fontWeight: 'bold',
+  itemText: {
+    fontSize: 16,
+    color: "#333",
   },
-  middleSection: {
-    marginVertical: 30,
+  bottomSection: {
+    paddingVertical: 20,
   },
   authButton: {
-    backgroundColor: 'white',
-    borderColor: 'red',
-    borderWidth: 2,
-    color: 'blue',
     padding: 15,
-    borderRadius: 8,
-    marginBottom: 15,
-    alignItems: 'center',
+    borderRadius: 5,
+    alignItems: "center",
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "red",
   },
   signupButton: {
-    backgroundColor: '#dc2626',
+    backgroundColor: "red",
+    borderWidth: 0,
   },
-    authButtonText1: {
-    color: 'red',
-    fontWeight: 'bold',
+  authButtonText1: {
+    color: "red",
+    fontWeight: "bold",
     fontSize: 16,
   },
   authButtonText2: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  bottomSection: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-    right: 20,
-  },
-  bottomButton: {
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#555',
-  },
-  bottomButtonText: {
-    color: 'white',
+    color: "white",
+    fontWeight: "bold",
     fontSize: 16,
   },
 });
-
-export default Sidebar;
