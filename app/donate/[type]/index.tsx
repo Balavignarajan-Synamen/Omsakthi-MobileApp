@@ -89,9 +89,9 @@ export default function DonateType() {
   const { triggerAuth, isAuthenticated } = useAuth();
 
   const [breadcrumb, setBreadcrumb] = useState({
-    title: "Contact",
+    title: "Donate",
     path: [
-      { label: "Home", link: "/" },
+      { label: "Home", link: "index" },
       { label: "Donate", link: `/donate?trust_id=${trustId}` },
     ],
   });
@@ -199,8 +199,9 @@ useEffect(() => {
         setIsTypeContentLoading(false);
         setTypeContent(res.data);
         setLatcharchanaiAmount(res.data?.amount);
-
+console.log("trustId in breadcrumb:", trustId);
         setBreadcrumb({
+          
           title: res.data.name,
           path: [
             { label: "Home", link: "/" },
@@ -676,7 +677,10 @@ useEffect(() => {
   }
 
   return (
+
     <SafeAreaView className="flex-1 bg-white">
+             <Breadcrumb breadcrumb={breadcrumb} /> 
+
       <StatusBar style="dark" />
       <ScrollView className="flex-1 p-4">
         <View className="items-center mb-6">

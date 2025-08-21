@@ -102,55 +102,74 @@ export default function HomeScreen() {
           <Text className="my-6 text-center text-xl font-bold  text-acmec-red md:text-3xl">
             Donate to Our Trusts
           </Text>
-         {isTrustLoading ? (
-  <ActivityIndicator size="large" className="my-6" />
-) : (
-  <FlatList
-    data={trustData}
-    keyExtractor={(item) => item.id.toString()}
-    numColumns={width > 768 ? 2 : 1} // ✅ 2 per row for tablet, 1 for mobile
-    columnWrapperStyle={
-      width > 768 ? { justifyContent: "space-around" } : undefined
-    }
-    renderItem={({ item }) => (
-      <Link href={`/donate?trust_id=${item.id}`} asChild>
-        <TouchableOpacity
-          className="m-2 flex-1 overflow-hidden rounded-2xl"
-          activeOpacity={0.9}
-        >
-          <LinearGradient
-            colors={["#a7150bf2", "#fd580bf2"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            className="rounded-2xl p-4"
-          >
-            <View className="items-center">
-              {item.logo ? (
-                <Image
-                  source={{ uri: item.logo }}
-                  className="mb-3 h-20 w-20 rounded-full border-2 border-acmec-yellow"
-                  resizeMode="contain"
-                />
-              ) : (
-                <View className="mb-3 h-16 w-16 items-center justify-center rounded-full bg-acmec-yellow">
-                  <FontAwesome name="heart-o" size={18} color="red" />
-                </View>
+          {isTrustLoading ? (
+            <ActivityIndicator size="large" className="my-6" />
+          ) : (
+            <FlatList
+              data={trustData}
+              keyExtractor={(item) => item.id.toString()}
+              numColumns={width > 768 ? 2 : 1} // ✅ 2 per row for tablet, 1 for mobile
+              columnWrapperStyle={
+                width > 768 ? { justifyContent: 'space-around' } : undefined
+              }
+              renderItem={({ item }) => (
+                <Link href={`/donate?trust_id=${item.id}`} asChild>
+                  <TouchableOpacity
+                    className="m-2 flex-1 overflow-hidden rounded-2xl"
+                    activeOpacity={0.9}
+                  >
+                    <LinearGradient
+                      colors={['#a7150bf2', '#fd580bf2']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      className="rounded-2xl p-4"
+                    >
+                      <View className="items-center">
+                        {item.logo ? (
+                          <Image
+                            source={{ uri: item.logo }}
+                            className="mb-3 h-20 w-20 rounded-full border-2 border-acmec-yellow"
+                            resizeMode="contain"
+                          />
+                        ) : (
+                          <View className="mb-3 h-16 w-16 items-center justify-center rounded-full bg-acmec-yellow">
+                            <FontAwesome name="heart-o" size={18} color="red" />  
+                          </View>
+                        )}
+                      </View>
+
+                      <Text className="mb-2 text-center text-lg font-bold text-white">
+                        {item.name}
+                      </Text>
+                      <Text className="text-center text-sm text-white">
+                        {item.description}
+                      </Text>
+                      <View className="mt-4 items-center">
+                        <LinearGradient
+                          // colors={['#fff700f2', '#ff4d4df2']}
+                          colors={['#fff700f2', '#ff6600f2', '#ff3333f2']}
+
+                          end={{ x: 1, y: 1 }}
+                          className="rounded-2xl p-2 "
+                        >
+                          <View className="flex-row items-center rounded-xl  px-6 py-2">
+                            <Text className="mr-2 font-bold text-white text-xl">
+                              Donate Now
+                            </Text>
+                            <FontAwesome
+                              name="arrow-right"
+                              size={18}
+                              color="#fff"
+                            />
+                          </View>
+                        </LinearGradient>
+                      </View>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </Link>
               )}
-            </View>
-
-            <Text className="mb-2 text-center text-lg font-bold text-white">
-              {item.name}
-            </Text>
-            <Text className="text-center text-sm text-white">
-              {item.description}
-            </Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      </Link>
-    )}
-  />
-)}
-
+            />
+          )}
 
           {/* Section 2: Testimonials */}
           <Text className="my-6 text-center text-xl font-bold text-acmec-red md:text-3xl">
