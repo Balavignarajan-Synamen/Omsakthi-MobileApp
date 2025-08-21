@@ -1,7 +1,5 @@
-// import { Breadcrumb } from '@/components/Breadcrumb';
 import Breadcrumb from '@/src/components/breadcrumb';
 import { useAuth } from '@/src/context/auth-context';
-// import { useTrust } from '@/context/trustContext';
 import { useTrust } from '@/src/context/trust-context';
 import {
   apiCreateDonations,
@@ -14,7 +12,6 @@ import {
   apiUserProfile,
   apiUserRegister
 } from '@/src/services/api';
-// import { console.log } from '@/services/toast.service';
 import { handleApiErrors } from '@/src/utils/helper/api.helper';
 import { generateUUID } from '@/src/utils/helper/glober.helper';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -29,7 +26,10 @@ import DonateReceipt from './receipt';
 import VerifPanAadhaar from './verify-pan-aadhaar';
 
 export default function DonateType() {
-  const { selectedTrust } = useTrust();
+  const trustContext = useTrust();
+  // const { selectedTrust } = trustContext || {}; // Add null checking
+  const { selectedTrust, isLoading: isTrustLoading } = trustContext || {};
+  
   const router = useRouter();
   const params = useLocalSearchParams();
   const type = params.type as string;
@@ -39,7 +39,7 @@ export default function DonateType() {
     title: "",
     path: [
       { label: "Home", link: "/" },
-      { label: "Donate", link: `/${selectedTrust?.slug}/donate` },
+      { label: "Donate", link: selectedTrust?.slug ? `/${selectedTrust.slug}/donate` : "/donate" }, // Add fallback
     ],
   });
 
@@ -94,9 +94,21 @@ export default function DonateType() {
   const maxMembers = 5;
   const canAddMore = fields.length < maxMembers;
 
+  // Show loading if trust context is not available yet
+  if (!trustContext) {
+    return (
+      <View className="flex-1 justify-center items-center p-4">
+        <ActivityIndicator size="large" color="#e53e3e" />
+        <Text className="mt-4 text-gray-600">Loading trust information...</Text>
+      </View>
+    );
+  }
+
   useEffect(() => {
-    if (type) donationTypes(type);
-  }, [type]);
+    if (type && selectedTrust) {
+      donationTypes(type);
+    }
+  }, [type, selectedTrust]);
 
   useEffect(() => {
     const authStatus = localStorage.getItem("acmec.user_auth_status");
@@ -148,7 +160,9 @@ export default function DonateType() {
   }, [typeContent]);
 
   const donationTypes = (slug: string) => {
-    apiDonationTypeBySlug(slug, selectedTrust?.id)
+    if (!selectedTrust) return;
+    
+    apiDonationTypeBySlug(slug, selectedTrust.id)
       .then((res: any) => {
         setIsTypeContentLoading(false);
         setTypeContent(res.data);
@@ -158,7 +172,7 @@ export default function DonateType() {
           title: res.data.name,
           path: [
             { label: "Home", link: "/" },
-            { label: "Donate", link: `/${selectedTrust?.slug}/donate` },
+            { label: "Donate", link: `/${selectedTrust.slug}/donate` },
             { label: res.data.name, link: "" },
           ],
         });
@@ -498,8 +512,6 @@ export default function DonateType() {
     const postData = { donation_id: donationInfo?.id };
     apiRazorpayCreate(postData)
       .then((res: any) => {
-        // For React Native, you would typically use a WebView or deep linking for Razorpay
-        // This is a simplified implementation
         Alert.alert(
           "Payment",
           "Redirecting to payment gateway...",
@@ -507,7 +519,6 @@ export default function DonateType() {
             {
               text: "OK",
               onPress: () => {
-                // Simulate payment success
                 const callbackRequest = {
                   donation_id: donationInfo?.id,
                   razorpay_order_id: "mock_order_id",
@@ -545,8 +556,6 @@ export default function DonateType() {
 
     try {
       const response = await apiGetReceipt(postData);
-      // In React Native, you might want to use a PDF viewer component
-      // or open the PDF in an external app
       Alert.alert("Receipt", "Receipt downloaded successfully");
     } catch (error) {
       const message: string | null = handleApiErrors(error);
@@ -642,13 +651,11 @@ export default function DonateType() {
 
   if (screenType === "receipt") {
     return (
- <DonateReceipt 
- setIsReceiptLoading={setIsReceiptLoading}  // ✅ Correct prop name
-      isReceiptLoading={isReceiptLoading} 
-      getDonationReceipt={getDonationReceipt} 
-/>
-
-
+      <DonateReceipt 
+        setIsReceiptLoading={setIsReceiptLoading}
+        isReceiptLoading={isReceiptLoading} 
+        getDonationReceipt={getDonationReceipt} 
+      />
     );
   }
 
@@ -719,7 +726,7 @@ export default function DonateType() {
                     setValue("amount", text);
                     trigger("amount");
                   }}
-                  className="w-full rounded-lg border-0 px-3 py-2 bg-white border border-gray-300"
+                  className="w-full rounded-lg border-0 px-3 py-2 bg-white border-gray-300"
                   keyboardType="numeric"
                 />
                 {errors.amount && <Text className="text-red-600 text-xs">{(errors.amount as any).message}</Text>}
@@ -741,7 +748,7 @@ export default function DonateType() {
                     setValue("amount", text);
                     trigger("amount");
                   }}
-                  className="w-full rounded-lg border-0 px-3 py-2 bg-white border border-gray-300"
+                  className="w-full rounded-lg border-0 px-3 py-2 bg-white  border-gray-300"
                   keyboardType="numeric"
                 />
                 {errors.amount && <Text className="text-red-600 text-xs">{(errors.amount as any).message}</Text>}
@@ -861,7 +868,7 @@ export default function DonateType() {
                       <TextInput
                         {...register("password", { required: "Password is required" })}
                         secureTextEntry
-                        className="w-full rounded-lg border-0 px-3 py-2 bg-white border border-gray-300"
+                        className="w-full rounded-lg border-0 px-3 py-2 bg-white  border-gray-300"
                       />
                       {errors.password && <Text className="text-red-600 text-xs">{(errors.password as any).message}</Text>}
                     </View>
@@ -873,7 +880,7 @@ export default function DonateType() {
                       <TextInput
                         {...register("confirmpassword", { required: "Confirm Password is required" })}
                         secureTextEntry
-                        className="w-full rounded-lg border-0 px-3 py-2 bg-white border border-gray-300"
+                        className="w-full rounded-lg border-0 px-3 py-2 bg-white  border-gray-300"
                       />
                       {errors.confirmpassword && <Text className="text-red-600 text-xs">{(errors.confirmpassword as any).message}</Text>}
                     </View>
@@ -895,7 +902,7 @@ export default function DonateType() {
                       className="w-full rounded-lg border-0 px-3 py-2 bg-white  border-gray-300"
                     />
                     {errors.name && <Text className="text-red-600 text-xs">{(errors.name as any).message}</Text>}
-                  </View>
+                    </View>
 
                   <View className="mb-4">
                     <Text className="text-base text-red-600 mb-1">
@@ -911,7 +918,7 @@ export default function DonateType() {
                       })}
                       keyboardType="email-address"
                       autoCapitalize="none"
-                      className="w-full rounded-lg border-0 px-3 py-2 bg-white border border-gray-300"
+                      className="w-full rounded-lg border-0 px-3 py-2 bg-white  border-gray-300"
                     />
                     {errors.email && <Text className="text-red-600 text-xs">{(errors.email as any).message}</Text>}
                   </View>
@@ -923,7 +930,7 @@ export default function DonateType() {
                     <TextInput
                       {...register("phone", { required: "Phone is required" })}
                       keyboardType="phone-pad"
-                      className="w-full rounded-lg border-0 px-3 py-2 bg-white border border-gray-300"
+                      className="w-full rounded-lg border-0 px-3 py-2 bg-white  border-gray-300"
                     />
                     {errors.phone && <Text className="text-red-600 text-xs">{(errors.phone as any).message}</Text>}
                   </View>
@@ -937,7 +944,7 @@ export default function DonateType() {
                   </Text>
                   <TextInput
                     {...register("addressline1", { required: "Address is required" })}
-                    className="w-full rounded-lg border-0 px-3 py-2 bg-white border border-gray-300"
+                    className="w-full rounded-lg border-0 px-3 py-2 bg-white  border-gray-300"
                   />
                   {errors.addressline1 && <Text className="text-red-600 text-xs">{(errors.addressline1 as any).message}</Text>}
                 </View>
@@ -948,7 +955,7 @@ export default function DonateType() {
                   </Text>
                   <TextInput
                     {...register("addressline2")}
-                    className="w-full rounded-lg border-0 px-3 py-2 bg-white border border-gray-300"
+                    className="w-full rounded-lg border-0 px-3 py-2 bg-white  border-gray-300"
                   />
                 </View>
 
@@ -1003,7 +1010,7 @@ export default function DonateType() {
                   <TextInput
                     {...register("postalcode", { required: "Postal Code is required" })}
                     keyboardType="numeric"
-                    className="w-full rounded-lg border-0 px-3 py-2 bg-white border border-gray-300"
+                    className="w-full rounded-lg border-0 px-3 py-2 bg-white  border-gray-300"
                   />
                   {errors.postalcode && <Text className="text-red-600 text-xs">{(errors.postalcode as any).message}</Text>}
                 </View>

@@ -10,7 +10,7 @@ import {
 
 interface BreadcrumbItem {
   label: string
-  link?: string
+  link?: string | null // Allow both undefined and null
 }
 
 interface BreadcrumbProps {
@@ -34,21 +34,22 @@ export default function Breadcrumb({ breadcrumb }: BreadcrumbProps) {
           {breadcrumb?.path?.map((item, index) => {
             const isFirst = index === 0
             const isLast = index === breadcrumb.path.length - 1
+            const hasLink = item.link !== undefined && item.link !== null // Check for both existence and non-null
 
             return (
               <View key={index} style={styles.breadcrumbItem}>
                 {isFirst ? (
                   <TouchableOpacity
-                    onPress={() => item.link && router.push(item.link as any)}
+                    onPress={() => hasLink && router.push(item.link as any)}
                   >
                     <Text style={styles.firstLink}>🏠 {item.label}</Text>
                   </TouchableOpacity>
                 ) : (
                   <View style={styles.innerRow}>
                     <Text style={styles.separator}>/</Text>
-                    {item.link && !isLast ? (
+                    {hasLink && !isLast ? (
                       <TouchableOpacity
-                        onPress={() => router.push(item.link! as any)}
+                        onPress={() => router.push(item.link as any)}
                       >
                         <Text style={styles.link}>{item.label}</Text>
                       </TouchableOpacity>

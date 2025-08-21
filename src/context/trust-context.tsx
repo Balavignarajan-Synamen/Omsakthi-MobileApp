@@ -1,23 +1,27 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { usePathname } from "expo-router"; // Only if you are using expo-router
+import { usePathname } from "expo-router";
 import React, { createContext, useContext, useEffect, useState } from "react";
 
 const TrustContext = createContext<any>(null);
 
 export const TrustProvider = ({ children }: { children: React.ReactNode }) => {
-  const pathname = usePathname(); // works same as in Next.js but for Expo Router
+  const pathname = usePathname();
   const [selectedTrust, setSelectedTrust] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true); // Add loading state
 
   // Load saved trust on mount
   useEffect(() => {
     const loadTrust = async () => {
       try {
+        setIsLoading(true);
         const stored = await AsyncStorage.getItem("selectedTrust");
         if (stored) {
           setSelectedTrust(JSON.parse(stored));
         }
       } catch (e) {
         console.error("Failed to load selectedTrust:", e);
+      } finally {
+        setIsLoading(false);
       }
     };
     loadTrust();
@@ -49,7 +53,7 @@ export const TrustProvider = ({ children }: { children: React.ReactNode }) => {
   }, [selectedTrust]);
 
   return (
-    <TrustContext.Provider value={{ selectedTrust, setSelectedTrust }}>
+    <TrustContext.Provider value={{ selectedTrust, setSelectedTrust, isLoading }}>
       {children}
     </TrustContext.Provider>
   );
