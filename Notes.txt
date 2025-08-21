@@ -29,3 +29,6 @@ omsakthi-mobileapp/
 **Issues**
 1. DAte in form 
 2. state and country dropdown design
+3. thaipoosam count add number input
+4. Masa/ammavasai veli = only show specific date based on api
+5. amount default somethind shows in place holder 

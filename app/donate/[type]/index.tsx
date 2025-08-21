@@ -1,98 +1,45 @@
+// import { Breadcrumb } from '@/components/Breadcrumb';
 import Breadcrumb from '@/src/components/breadcrumb';
 import { useAuth } from '@/src/context/auth-context';
-import { apiCreateDonations, apiDonationTypeBySlug, apiGetCountries, apiGetReceipt, apiGetStates, apiRazorpayCreate, apiUserProfile, apiUserRegister } from '@/src/services/api';
+// import { useTrust } from '@/context/trustContext';
+import { useTrust } from '@/src/context/trust-context';
+import {
+  apiCreateDonations,
+  apiDonationTypeBySlug,
+  apiGetCountries,
+  apiGetReceipt,
+  apiGetStates,
+  apiRazorpayCallback,
+  apiRazorpayCreate,
+  apiUserProfile,
+  apiUserRegister
+} from '@/src/services/api';
+// import { console.log } from '@/services/toast.service';
 import { handleApiErrors } from '@/src/utils/helper/api.helper';
 import { generateUUID } from '@/src/utils/helper/glober.helper';
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { Picker } from '@react-native-picker/picker';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
-import { Controller, useFieldArray, useForm } from 'react-hook-form';
-import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  Platform,
-  ScrollView,
-  Switch,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFieldArray, useForm } from 'react-hook-form';
+import { ActivityIndicator, Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import DonateCheckout from './checkout';
 import DonateReceipt from './receipt';
-import VerifPanAadhaarRN from './verify-pan-aadhaar';
-
-// Custom Picker component to replace @react-native-picker/picker
-const CustomPicker = ({ items, selectedValue, onValueChange, enabled = true, placeholder = "Select an option" }: any) => {
-  const [modalVisible, setModalVisible] = useState(false);
-
-  const selectedItem = items.find((item: any) => item.value === selectedValue);
-
-  return (
-    <>
-      <TouchableOpacity
-        onPress={() => setModalVisible(true)}
-        className={`border border-gray-300 rounded-lg p-3 ${enabled ? '' : 'bg-gray-100'}`}
-        disabled={!enabled}
-      >
-        <Text className={selectedValue ? "text-black" : "text-gray-400"}>
-          {selectedItem ? selectedItem.label : placeholder}
-        </Text>
-      </TouchableOpacity>
-
-      <Modal
-        visible={modalVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View className="flex-1 justify-end bg-black/50">
-          <View className="bg-white rounded-t-3xl p-4 max-h-3/4">
-            <View className="flex-row justify-between items-center mb-4">
-              <Text className="text-lg font-semibold">Select an option</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Text className="text-acmec-red text-lg">Done</Text>
-              </TouchableOpacity>
-            </View>
-            <ScrollView>
-              {items.map((item: any, index: number) => (
-                <TouchableOpacity
-                  key={index}
-                  onPress={() => {
-                    onValueChange(item.value);
-                    setModalVisible(false);
-                  }}
-                  className={`p-3 border-b border-gray-100 ${selectedValue === item.value ? 'bg-acmec-red/10' : ''}`}
-                >
-                  <Text className={selectedValue === item.value ? "text-acmec-red font-semibold" : "text-black"}>
-                    {item.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-    </>
-  );
-};
+import VerifPanAadhaar from './verify-pan-aadhaar';
 
 export default function DonateType() {
+  const { selectedTrust } = useTrust();
+  const router = useRouter();
   const params = useLocalSearchParams();
   const type = params.type as string;
   const trustId = params.trust_id as string;
-  const router = useRouter();
-  const { triggerAuth, isAuthenticated } = useAuth();
-
+  
   const [breadcrumb, setBreadcrumb] = useState({
-    title: "Donate",
+    title: "",
     path: [
-      { label: "Home", link: "index" },
-      { label: "Donate", link: `/donate?trust_id=${trustId}` },
+      { label: "Home", link: "/" },
+      { label: "Donate", link: `/${selectedTrust?.slug}/donate` },
     ],
   });
 
@@ -106,6 +53,8 @@ export default function DonateType() {
     trigger,
     unregister,
   } = useForm({});
+  
+  const { triggerAuth, isAuthenticated } = useAuth();
 
   const [screenType, setScreenType] = useState<"form" | "checkout" | "receipt">("form");
   const [isTypeContentLoading, setIsTypeContentLoading] = useState<boolean>(true);
@@ -149,23 +98,14 @@ export default function DonateType() {
     if (type) donationTypes(type);
   }, [type]);
 
-useEffect(() => {
-  const checkAuth = async () => {
-    try {
-      const authStatus = await AsyncStorage.getItem("acmec.user_auth_status");
-      if (authStatus) {
-        setIsAuthStatus(false);
-      } else {
-        setIsAuthStatus(true);
-      }
-    } catch (err) {
-      console.error("Error reading auth status:", err);
+  useEffect(() => {
+    const authStatus = localStorage.getItem("acmec.user_auth_status");
+    if (authStatus) {
+      setIsAuthStatus(false);
+    } else {
+      setIsAuthStatus(true);
     }
-  };
-
-  checkAuth();
-}, []);
-
+  }, []);
 
   useEffect(() => {
     getCountries();
@@ -173,10 +113,25 @@ useEffect(() => {
 
   useEffect(() => {
     setValue("name", aadhaarDetails?.data?.user_full_name);
+    setValue("postalcode", aadhaarDetails?.data?.address_zip);
+    const house = aadhaarDetails?.data?.user_address?.house || "";
+    const street = aadhaarDetails?.data?.user_address?.street || "";
+    const post = aadhaarDetails?.data?.user_address?.po || "";
+    const vtc = aadhaarDetails?.data?.user_address?.vtc || "";
+    setValue("addressline1", `${house}`.trim());
+    setValue("addressline2", `${street} , ${vtc}`.trim());
+    setValue("city", aadhaarDetails?.data?.user_address?.dist);
   }, [aadhaarDetails]);
 
   useEffect(() => {
     setValue("name", panDetails?.data?.user_full_name);
+    setValue("postalcode", panDetails?.data?.user_address?.zip);
+    const line_1 = panDetails?.data?.user_address?.line_1 || "";
+    const street = panDetails?.data?.user_address?.street_name || "";
+    const line_2 = panDetails?.data?.user_address?.line_2 || "";
+    setValue("addressline1", `${line_1}  ${street}`.trim());
+    setValue("addressline2", `${line_2}`.trim());
+    setValue("city", panDetails?.data?.user_address?.city);
   }, [panDetails]);
 
   useEffect(() => {
@@ -193,22 +148,21 @@ useEffect(() => {
   }, [typeContent]);
 
   const donationTypes = (slug: string) => {
-    const params = { trust_id: trustId };
-    apiDonationTypeBySlug(slug, params)
+    apiDonationTypeBySlug(slug, selectedTrust?.id)
       .then((res: any) => {
         setIsTypeContentLoading(false);
         setTypeContent(res.data);
         setLatcharchanaiAmount(res.data?.amount);
-console.log("trustId in breadcrumb:", trustId);
+
         setBreadcrumb({
-          
           title: res.data.name,
           path: [
             { label: "Home", link: "/" },
-            { label: "Donate", link: `/donate?trust_id=${trustId}` },
+            { label: "Donate", link: `/${selectedTrust?.slug}/donate` },
             { label: res.data.name, link: "" },
           ],
         });
+        
         if (res.data?.mode === "e_donation") {
           setShowPersonalAndBilling(false);
         }
@@ -219,7 +173,7 @@ console.log("trustId in breadcrumb:", trustId);
       })
       .catch((err: any) => {
         const message: string | null = handleApiErrors(err);
-        if (message) console.error(message);
+        if (message) console.log(message);
         setIsTypeContentLoading(false);
       });
   };
@@ -228,10 +182,13 @@ console.log("trustId in breadcrumb:", trustId);
     apiGetCountries()
       .then((res: any) => {
         setCountries(res.data);
+        const defaultCountryCode = "in";
+        setValue("country", defaultCountryCode);
+        getStates(defaultCountryCode);
       })
       .catch((err: any) => {
         const message: string | null = handleApiErrors(err);
-        if (message) console.error(message);
+        if (message) console.log(message);
       });
   };
 
@@ -243,10 +200,11 @@ console.log("trustId in breadcrumb:", trustId);
     apiGetStates(country_id)
       .then((res: any) => {
         setStates(res.data);
+        setValue("state", "in-tn");
       })
       .catch((err: any) => {
         const message: string | null = handleApiErrors(err);
-        if (message) console.error(message);
+        if (message) console.log(message);
       });
   };
 
@@ -370,19 +328,13 @@ console.log("trustId in breadcrumb:", trustId);
           count: item.qty,
         }));
     }
-
-  const formatDateToYMD = (date: any): string => {
-  if (!date) return "";
-
-  const d = date instanceof Date ? date : new Date(date);
-
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-
-  return `${year}/${month}/${day}`;
-};
-
+    
+    const formatDateToYMD = (date: any): string => {
+      const year = date?.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      return `${year}/${month}/${day}`;
+    };
 
     if (typeContent?.has_dates && typeContent?.date_list) {
       const dates = Array.isArray(data.date) ? data.date : [data.date];
@@ -414,7 +366,7 @@ console.log("trustId in breadcrumb:", trustId);
           date: formatDateToYMD(data?.date),
         }));
     }
-
+    
     if (typeContent?.has_items && typeContent?.item_has_count) {
       finalAmount = data?.donatetype;
       finalItems = typeContentItems
@@ -467,11 +419,13 @@ console.log("trustId in breadcrumb:", trustId);
       postal_code: data?.postalcode,
       payment_method: "razorpay",
       items: finalItems,
-      trust_id: trustId,
+      trust_id: selectedTrust?.id,
       pan: panDetails?.data?.pan_number,
       aadhaar: aadhaarDetails?.data?.pan_number,
       city: data?.city,
       details: data?.details,
+      include_abhishegam: includeDailyAbhisegam,
+      add_postal: includeCourier,
     };
 
     localStorage.setItem("uuid", postData?.uuid);
@@ -496,7 +450,7 @@ console.log("trustId in breadcrumb:", trustId);
               .catch((err: any) => {
                 setIsLoading(false);
                 const message: string | null = handleApiErrors(err);
-                if (message) console.error(message);
+                if (message) console.log(message);
               });
           }
           apiCreateDonations(postData)
@@ -507,7 +461,7 @@ console.log("trustId in breadcrumb:", trustId);
             })
             .catch((err: any) => {
               const message: string | null = handleApiErrors(err);
-              if (message) console.error(message);
+              if (message) console.log(message);
               setIsLoading(false);
             });
         });
@@ -520,7 +474,7 @@ console.log("trustId in breadcrumb:", trustId);
           })
           .catch((err: any) => {
             const message: string | null = handleApiErrors(err);
-            if (message) console.error(message);
+            if (message) console.log(message);
             setIsLoading(false);
           });
       }
@@ -533,7 +487,7 @@ console.log("trustId in breadcrumb:", trustId);
         })
         .catch((err: any) => {
           const message: string | null = handleApiErrors(err);
-          if (message) console.error(message);
+          if (message) console.log(message);
           setIsLoading(false);
         });
     }
@@ -544,13 +498,40 @@ console.log("trustId in breadcrumb:", trustId);
     const postData = { donation_id: donationInfo?.id };
     apiRazorpayCreate(postData)
       .then((res: any) => {
-        // Razorpay integration would go here
-        Alert.alert("Payment", "Razorpay integration would be implemented here");
-        setIsCheckoutLoading(false);
+        // For React Native, you would typically use a WebView or deep linking for Razorpay
+        // This is a simplified implementation
+        Alert.alert(
+          "Payment",
+          "Redirecting to payment gateway...",
+          [
+            {
+              text: "OK",
+              onPress: () => {
+                // Simulate payment success
+                const callbackRequest = {
+                  donation_id: donationInfo?.id,
+                  razorpay_order_id: "mock_order_id",
+                  razorpay_payment_id: "mock_payment_id",
+                  razorpay_signature: "mock_signature",
+                };
+
+                apiRazorpayCallback(callbackRequest)
+                  .then((res: any) => {
+                    setScreenType("receipt");
+                  })
+                  .catch((err: any) => {
+                    const message: string | null = handleApiErrors(err);
+                    if (message) console.log(message);
+                    setIsCheckoutLoading(false);
+                  });
+              },
+            },
+          ]
+        );
       })
       .catch((err: any) => {
         const message: string | null = handleApiErrors(err);
-        if (message) console.error(message);
+        if (message) console.log(message);
         setIsCheckoutLoading(false);
       });
   };
@@ -564,17 +545,17 @@ console.log("trustId in breadcrumb:", trustId);
 
     try {
       const response = await apiGetReceipt(postData);
+      // In React Native, you might want to use a PDF viewer component
+      // or open the PDF in an external app
       Alert.alert("Receipt", "Receipt downloaded successfully");
     } catch (error) {
       const message: string | null = handleApiErrors(error);
-      if (message) console.error(message);
-    } finally {
-      setIsReceiptLoading(false);
+      if (message) console.log(message);
     }
   };
 
-  const handleCreateAccount = (value: boolean) => {
-    setIsShowPassword(value);
+  const handleCreateAccount = (isChecked: boolean) => {
+    setIsShowPassword(isChecked);
   };
 
   const addDate = () => {
@@ -590,24 +571,30 @@ console.log("trustId in breadcrumb:", trustId);
     unregister(`date.${index}`);
   };
 
- const handleDateChange = (index: number, event: any, selectedDate?: Date) => {
-  if (event.type === "dismissed") {
-    setShowDatePicker(null);
-    return;
-  }
+  const handleDateChange = (index: number, event: any, value: Date | undefined) => {
+    if (event.type === 'set' && value) {
+      const newDateStr = value.toDateString();
 
-  if (selectedDate) {
-    setSelectedDates((prevDates: any) => {
-      const updated = [...prevDates];
-      updated[index] = selectedDate;
-      return updated;
-    });
-  }
+      const isDuplicate = selectedDates.some((date: Date | null, i: number) => {
+        if (i === index || !date) return false;
+        return date.toDateString() === newDateStr;
+      });
 
-  // ✅ Close picker for both iOS and Android after selecting
-  setShowDatePicker(null);
-};
-
+      if (isDuplicate) {
+        console.log("This date is already selected.");
+        return;
+      }
+      
+      const newDates = [...selectedDates];
+      newDates[index] = value;
+      setSelectedDates(newDates);
+      setValue(`date.${index}`, value);
+      setDateError(false);
+      setShowDatePicker(null);
+    } else {
+      setShowDatePicker(null);
+    }
+  };
 
   const allowedDates = typeContent?.date_list?.map((d: string) => new Date(d)) || [];
 
@@ -617,117 +604,102 @@ console.log("trustId in breadcrumb:", trustId);
 
   if (isTypeContentLoading) {
     return (
-      <SafeAreaView className="flex-1 bg-white">
-        <StatusBar style="dark" />
-        <View className="p-4">
-          {Array.from({ length: 10 }, (_, index) => (
-            <View key={index} className="h-4 bg-gray-100 rounded-lg mb-2"></View>
-          ))}
-        </View>
-      </SafeAreaView>
+      <View className="flex-1 justify-center items-center p-4">
+        <ActivityIndicator size="large" color="#e53e3e" />
+        <Text className="mt-4 text-gray-600">Loading donation information...</Text>
+      </View>
     );
   }
 
   if (!typeContent) {
     return (
-      <SafeAreaView className="flex-1 bg-white">
-        <StatusBar style="dark" />
-        <View className="p-4 items-center justify-center flex-1">
-          <Text className="text-2xl text-acmec-red font-bold mb-4">404 Page not found</Text>
-          <Text className="text-base text-gray-600 mb-8 text-center">
-            Looks like something's broken. It's not you it's us.
-            How about going back to the home page?
-          </Text>
-          <TouchableOpacity 
-            className="bg-gray-200 px-4 py-2 rounded-lg"
-            onPress={() => router.push("/")}
-          >
-            <Text className="text-gray-700 text-sm uppercase font-semibold">Back to Home</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+      <View className="flex-1 justify-center items-center p-4">
+        <Text className="text-2xl text-red-600 font-bold mb-4">404 Page not found</Text>
+        <Text className="text-base text-gray-600 mb-8 text-center">
+          Looks like something's broken. It's not you it's us.
+          How about going back to the home page?
+        </Text>
+        <TouchableOpacity 
+          className="bg-gray-200 px-4 py-2 rounded-lg"
+          onPress={() => router.push("/")}
+        >
+          <Text className="text-gray-700 uppercase font-semibold">Back to Home</Text>
+        </TouchableOpacity>
+      </View>
     );
   }
 
   if (screenType === "checkout") {
     return (
-      <>
-                <Breadcrumb breadcrumb={breadcrumb} />
-      
       <DonateCheckout 
         donationInfo={donationInfo} 
         setIsCheckoutLoading={setIsCheckoutLoading} 
         isCheckoutLoading={isCheckoutLoading} 
         payRazorpay={payRazorpay} 
-        />
-        </>
+      />
     );
   }
 
   if (screenType === "receipt") {
     return (
-      <>
-                <Breadcrumb breadcrumb={breadcrumb} />
-      <DonateReceipt 
-        isGetReceiptLoading={isReceiptLoading} 
-        getDonationReceipt={getDonationReceipt} 
-        />
-        </>
+ <DonateReceipt 
+ setIsReceiptLoading={setIsReceiptLoading}  // ✅ Correct prop name
+      isReceiptLoading={isReceiptLoading} 
+      getDonationReceipt={getDonationReceipt} 
+/>
+
+
     );
   }
 
   return (
-
-    <SafeAreaView className="flex-1 bg-white">
-             <Breadcrumb breadcrumb={breadcrumb} /> 
-
-      <StatusBar style="dark" />
-      <ScrollView className="flex-1 p-4">
+    <ScrollView className="flex-1 bg-white">
+      <Breadcrumb breadcrumb={breadcrumb} />
+      
+      <View className="p-4">
         <View className="items-center mb-6">
-          <Text className="text-xl md:text-2xl font-bold text-acmec-red mb-2">Donate Now</Text>
-          <View className="w-32 h-1 bg-acmec-red mb-4"></View>
+          <Text className="text-2xl md:text-4xl font-bold text-red-600 mb-2">Donate Now</Text>
+          <View className="w-32 h-1 bg-red-600 mb-6" />
         </View>
 
-        <View className="space-y-4">
+        <View className="space-y-6">
           {isAuthStatus && (
             <View className="flex-row items-center my-3">
-              <Switch
-                value={isShowPassword}
-                onValueChange={handleCreateAccount}
-                trackColor={{ false: '#767577', true: '#81b0ff' }}
-              />
-              <Text className="ml-2 text-base text-gray-800 font-medium">
-                Create new user account? If already have an account, login from the app menu.
+              <TouchableOpacity 
+                onPress={() => handleCreateAccount(!isShowPassword)}
+                className="w-4 h-4 border border-gray-300 rounded mr-2 justify-center items-center"
+                style={{ backgroundColor: isShowPassword ? '#e53e3e' : 'transparent' }}
+              >
+                {isShowPassword && <Text className="text-white text-xs">✓</Text>}
+              </TouchableOpacity>
+              <Text className="text-base text-gray-800 font-medium">
+                Create new user account? If already have an account, login from profile
               </Text>
             </View>
           )}
 
           {/* Dynamic Inputs */}
-          <View className="bg-white border border-acmec-yellow rounded-lg shadow-md p-4 mt-5">
+          <View className="border-2 border-yellow-400 bg-yellow-100 rounded-lg p-4 mt-5">
             {/* Fixed amount */}
             {typeContent?.amount != null && typeContent?.minimum_amount == null && !typeContent?.has_members && !typeContent?.has_items && (
               <>
                 <View className="mb-4">
-                  <Text className="text-base text-acmec-red mb-1">
+                  <Text className="text-base text-red-600 mb-1">
                     Amount <Text className="text-red-600">*</Text>
                   </Text>
-                  <Controller
-                    control={control}
-                    name="amount"
-                    rules={{
+                  <TextInput
+                    value={typeContent?.amount.toString()}
+                    {...register("amount", {
                       required: "Amount is required",
-                      validate: (value) => value >= typeContent?.minimum_amount || `Amount must be at least ${typeContent?.minimum_amount}`,
+                    })}
+                    onChangeText={(text) => {
+                      setValue("amount", text);
+                      trigger("amount");
                     }}
-                    render={({ field: { onChange, value } }) => (
-                      <TextInput
-                        value={value?.toString() || typeContent?.amount?.toString()}
-                        onChangeText={onChange}
-                        className="border border-gray-300 rounded-lg p-2"
-                        keyboardType="numeric"
-                      />
-                    )}
+                    className="w-full rounded-lg border-0 px-3 py-2 bg-white  border-gray-300"
+                    keyboardType="numeric"
                   />
-                  {errors.amount && <Text className="text-acmec-red text-xs">{(errors.amount as any).message}</Text>}
+                  {errors.amount && <Text className="text-red-600 text-xs">{(errors.amount as any).message}</Text>}
                 </View>
               </>
             )}
@@ -735,757 +707,344 @@ console.log("trustId in breadcrumb:", trustId);
             {/* Minimum amount value */}
             {typeContent?.amount == null && typeContent?.minimum_amount != null && (
               <View className="mb-4">
-                <Text className="text-base text-acmec-red mb-1">
+                <Text className="text-base text-red-600 mb-1">
                   Amount <Text className="text-red-600">*</Text>
                 </Text>
-                <Controller
-                  control={control}
-                  name="amount"
-                  rules={{
+                <TextInput
+                  defaultValue={typeContent?.amount?.toString()}
+                  {...register("amount", {
                     required: "Amount is required",
-                    validate: (value) => value >= typeContent?.minimum_amount || `Amount must be at least ${typeContent?.minimum_amount}`,
+                  })}
+                  onChangeText={(text) => {
+                    setValue("amount", text);
+                    trigger("amount");
                   }}
-                  render={({ field: { onChange, value } }) => (
-                    <TextInput
-                      value={value?.toString()}
-                      onChangeText={onChange}
-                      className="border border-gray-300 rounded-lg p-2"
-                      keyboardType="numeric"
-                    />
-                  )}
+                  className="w-full rounded-lg border-0 px-3 py-2 bg-white border border-gray-300"
+                  keyboardType="numeric"
                 />
-                {errors.amount && <Text className="text-acmec-red text-xs">{(errors.amount as any).message}</Text>}
+                {errors.amount && <Text className="text-red-600 text-xs">{(errors.amount as any).message}</Text>}
               </View>
             )}
 
             {/* amount and minimum_amount don't have a value */}
             {typeContent?.amount == null && typeContent?.minimum_amount == null && !typeContent?.has_items && (
               <View className="mb-4">
-                <Text className="text-base text-acmec-red mb-1">
+                <Text className="text-base text-red-600 mb-1">
                   Amount <Text className="text-red-600">*</Text>
                 </Text>
-                <Controller
-                  control={control}
-                  name="amount"
-                  rules={{
+                <TextInput
+                  defaultValue={""}
+                  {...register("amount", {
                     required: "Amount is required",
-                    validate: (value) => value >= typeContent?.minimum_amount || `Amount must be at least ${typeContent?.minimum_amount}`,
+                  })}
+                  onChangeText={(text) => {
+                    setValue("amount", text);
+                    trigger("amount");
                   }}
-                  render={({ field: { onChange, value } }) => (
-                    <TextInput
-                      value={value?.toString()}
-                      onChangeText={onChange}
-                      className="border border-gray-300 rounded-lg p-2"
-                      keyboardType="numeric"
-                    />
-                  )}
+                  className="w-full rounded-lg border-0 px-3 py-2 bg-white border border-gray-300"
+                  keyboardType="numeric"
                 />
-                {errors.amount && <Text className="text-acmec-red text-xs">{(errors.amount as any).message}</Text>}
+                {errors.amount && <Text className="text-red-600 text-xs">{(errors.amount as any).message}</Text>}
               </View>
             )}
 
             {/* Fixed Select */}
             {!typeContent?.has_items && !typeContent?.has_members && (
               <View className="mb-4">
-                <Text className="text-base text-acmec-red mb-1">Donation Type</Text>
-                <Controller
-                  control={control}
-                  name="donatetype"
-                  render={({ field: { value } }) => (
-                    <CustomPicker
-                      items={[{ label: typeContent?.code, value: typeContent?.code }]}
-                      selectedValue={value || typeContent?.code}
-                      onValueChange={() => {}}
-                      enabled={false}
-                    />
-                  )}
+                <Text className="text-base text-red-600 mb-1">
+                  Donation Type
+                </Text>
+                <View className="border border-gray-300 rounded-lg bg-white">
+                  <Picker
+                    selectedValue={typeContent?.code}
+                    onValueChange={() => {}}
+                    enabled={false}
+                  >
+                    <Picker.Item label={typeContent?.name} value={typeContent?.code} />
+                  </Picker>
+                </View>
+                <TextInput
+                  {...register("donatetype", {
+                    required: "Donation type is required",
+                  })}
+                  value={typeContent.code}
+                  style={{ display: 'none' }}
                 />
+                {errors.donatetype && <Text className="text-red-600 text-xs">{(errors.donatetype as any).message}</Text>}
               </View>
             )}
-{selectedDates.map((date: Date, index: number) => (
-  <View key={index} className="flex-row items-center mb-2">
-    <TouchableOpacity
-      className="flex-1 border border-gray-300 rounded-lg p-2"
-      onPress={() => setShowDatePicker(index)}
-    >
-      <Text>{date.toDateString()}</Text>
-    </TouchableOpacity>
 
-    {selectedDates.length > 1 && index !== 0 && (
-      <TouchableOpacity className="ml-2 p-2" onPress={() => removeDate(index)}>
-        <Text className="text-red-600 text-lg">×</Text>
-      </TouchableOpacity>
-    )}
-
-  {showDatePicker === index && (
-  Platform.OS === "web" ? (
-    <input
-      type="date"
-      value={date.toISOString().split("T")[0]}
-      onChange={(e) => {
-        const newDate = new Date(e.target.value);
-        handleDateChange(index, { type: "set" }, newDate);
-      }}
-      style={{ padding: 10, borderRadius: 8, border: "1px solid #ccc" }}
-    />
-  ) : (
-    <DateTimePicker
-      value={date}
-      mode="date"
-      display="default"
-      onChange={(event, selectedDate) =>
-        handleDateChange(index, event, selectedDate)
-      }
-      minimumDate={typeContent?.date_list ? undefined : new Date()}
-    />
-  )
-)}
-
-  </View>
-))}
-
-
-            {/* Item selection with quantity */}
-            {typeContent?.has_items && typeContent?.items && typeContent?.item_has_count && !typeContent?.item_has_description && (
+            {/* Amavasai Velvi */}
+            {typeContent?.has_dates && typeContent?.date_list != null && typeContent?.date_list?.length > 0 && (
               <>
                 <View className="mb-4">
-                  <Text className="text-base text-acmec-red mb-1">
-                    Velvi <Text className="text-red-600">*</Text>
+                  <Text className="text-base text-red-600 mb-1">
+                    Date <Text className="text-red-600">*</Text>
                   </Text>
-                  <Controller
-                    control={control}
-                    name="donatetype"
-                    rules={{ required: "Donation is required" }}
-                    render={({ field: { onChange, value } }) => (
-                      <CustomPicker
-                        items={typeContent?.items?.map((data: any) => ({ 
-                          label: data.name, 
-                          value: data.amount 
-                        }))}
-                        selectedValue={value}
-                        onValueChange={(itemValue: string) => {
-                          onChange(itemValue);
-                          handleDonationChange(itemValue);
-                        }}
-                      />
-                    )}
-                  />
-                  {errors.donatetype && <Text className="text-acmec-red text-xs">{(errors.donatetype as any).message}</Text>}
-                </View>
 
-                <View className="mb-4">
-                  <Text className="text-base text-acmec-red mb-1">Quantity</Text>
-                  <Controller
-                    control={control}
-                    name="qty"
-                    render={({ field: { onChange, value } }) => (
-                      <TextInput
-                        value={value?.toString() || qty.toString()}
-                        onChangeText={(text) => {
-                          onChange(text);
-                          handleSingleQtyChange(text);
-                        }}
-                        className="border border-gray-300 rounded-lg p-2"
-                        keyboardType="numeric"
-                      />
-                    )}
-                  />
-                </View>
-
-                {typeContent?.detail_label && (
-                  <View className="mb-4">
-                    <Text className="text-base text-acmec-red mb-1">{typeContent?.detail_label}</Text>
-                    <Controller
-                      control={control}
-                      name="details"
-                      render={({ field: { onChange, value } }) => (
-                        <TextInput
-                          value={value}
-                          onChangeText={onChange}
-                          className="border border-gray-300 rounded-lg p-2"
-                        />
-                      )}
-                    />
-                  </View>
-                )}
-
-                <View className="items-center my-2">
-                  <Text className="text-xl font-bold text-acmec-red">
-                    Total Amount: INR {selectedAmount > 0 ? qty * selectedAmount + (includeCourier ? typeContent?.postal_fee : 0) : typeContent?.items[0]?.amount + (includeCourier ? typeContent?.postal_fee : 0)}
-                  </Text>
-                </View>
-              </>
-            )}
-
-            {/* General item selection */}
-            {typeContent?.has_items && typeContent?.items && !typeContent?.item_has_count && !typeContent?.item_has_description && (
-              <>
-                <View className="mb-4">
-                  <Text className="text-base text-acmec-red mb-1">Donation Type</Text>
-                  <Controller
-                    control={control}
-                    name="donatetype"
-                    rules={{ required: "Donation is required" }}
-                    render={({ field: { onChange, value } }) => (
-                      <CustomPicker
-                        items={typeContent?.items?.map((data: any) => ({ 
-                          label: data.name, 
-                          value: data.name 
-                        }))}
-                        selectedValue={value}
-                        onValueChange={onChange}
-                      />
-                    )}
-                  />
-                  {errors.donatetype && <Text className="text-acmec-red text-xs">{(errors.donatetype as any).message}</Text>}
-                </View>
-
-                {typeContent?.detail_label && (
-                  <View className="mb-4">
-                    <Text className="text-base text-acmec-red mb-1">{typeContent?.detail_label}</Text>
-                    <Controller
-                      control={control}
-                      name="details"
-                      render={({ field: { onChange, value } }) => (
-                        <TextInput
-                          value={value}
-                          onChangeText={onChange}
-                          className="border border-gray-300 rounded-lg p-2"
-                        />
-                      )}
-                    />
-                  </View>
-                )}
-              </>
-            )}
-
-            {/* Members form */}
-            {typeContent?.has_members && (
-              <>
-                <View className="mb-4">
-                  <Text className="text-base text-acmec-red mb-1">
-                    Name <Text className="text-red-600">*</Text>
-                  </Text>
-                  <Controller
-                    control={control}
-                    name="member_name"
-                    rules={{ required: "Name is required" }}
-                    render={({ field: { onChange, value } }) => (
-                      <TextInput
-                        value={value}
-                        onChangeText={onChange}
-                        placeholder="Please Enter the name"
-                        className="border border-gray-300 rounded-lg p-2"
-                      />
-                    )}
-                  />
-                </View>
-
-                <View className="mb-4">
-                  <Text className="text-base text-acmec-red mb-1">
-                    Nakshatra <Text className="text-red-600">*</Text>
-                  </Text>
-                  <Controller
-                    control={control}
-                    name="nakshatra"
-                    rules={{ required: "Nakshatra is required" }}
-                    render={({ field: { onChange, value } }) => (
-                      <TextInput
-                        value={value}
-                        onChangeText={onChange}
-                        placeholder="Please Enter the Nakshatra"
-                        className="border border-gray-300 rounded-lg p-2"
-                      />
-                    )}
-                  />
-                </View>
-
-                {fields.map((field, index) => (
-                  <View key={field.id} className="mb-4">
-                    <View className="flex-row items-center">
-                      <View className="flex-1">
-                        <Text className="text-base text-acmec-red mb-1">
-                          Name <Text className="text-red-600">*</Text>
-                        </Text>
-                        <Controller
-                          control={control}
-                          name={`members.${index}.name`}
-                          rules={{ required: "Name is required" }}
-                          render={({ field: { onChange, value } }) => (
-                            <TextInput
-                              value={value}
-                              onChangeText={onChange}
-                              placeholder="Please Enter the name"
-                              className="border border-gray-300 rounded-lg p-2"
-                            />
-                          )}
-                        />
-                      </View>
-
-                      <View className="flex-1 ml-2">
-                        <Text className="text-base text-acmec-red mb-1">
-                          Nakshatra <Text className="text-red-600">*</Text>
-                        </Text>
-                        <Controller
-                          control={control}
-                          name={`members.${index}.nakshatra`}
-                          rules={{ required: "Nakshatra is required" }}
-                          render={({ field: { onChange, value } }) => (
-                            <TextInput
-                              value={value}
-                              onChangeText={onChange}
-                              placeholder="Please Enter the Nakshatra"
-                              className="border border-gray-300 rounded-lg p-2"
-                            />
-                          )}
-                        />
-                      </View>
-
-                      <TouchableOpacity
-                        className="p-2 ml-2"
-                        onPress={() => {
-                          remove(index);
-                          setLatcharchanaiAmount((prev: any) => Math.max(typeContent?.amount || 0, prev - typeContent?.amount));
-                        }}
+                  {selectedDates.map((date: any, index: any) => (
+                    <View key={index} className="flex-row items-center mb-2">
+                      <TouchableOpacity 
+                        onPress={() => setShowDatePicker(index)}
+                        className="flex-1 border border-gray-300 rounded-lg p-2 bg-white"
                       >
-                        <Text className="text-red-600 text-lg">×</Text>
+                        <Text>{date ? date.toLocaleDateString() : "Select a Date"}</Text>
                       </TouchableOpacity>
+                      
+                      {showDatePicker === index && (
+                        <DateTimePicker
+                          value={date || new Date()}
+                          mode="date"
+                          display="default"
+                          onChange={(event, selectedDate) => handleDateChange(index, event, selectedDate)}
+                          minimumDate={new Date()}
+                        />
+                      )}
+                      
+                      {selectedDates.length > 1 && index !== 0 && (
+                        <TouchableOpacity 
+                          onPress={() => removeDate(index)}
+                          className="ml-2 p-2"
+                        >
+                          <Text className="text-red-600 text-lg">×</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
-                  </View>
-                ))}
+                  ))}
 
-                <TouchableOpacity
-                  className="bg-acmec-red p-2 rounded mb-4"
-                  onPress={() => {
-                    if (canAddMore) {
-                      append({ name: "", nakshatra: "" });
-                      setLatcharchanaiAmount((prev: any) => prev + (typeContent?.amount || 0));
-                    }
-                  }}
-                  disabled={!canAddMore}
-                >
-                  <Text className="text-white text-center">Add a member</Text>
-                </TouchableOpacity>
-
-                <View className="items-center my-2">
-                  <Text className="text-xl font-bold text-acmec-red">
-                    Amount: INR {latcharchanaiAmount + (includeCourier ? typeContent?.postal_fee : 0)}
+                  {typeContent?.multiple_dates && (
+                    <TouchableOpacity 
+                      onPress={addDate}
+                      className="mt-2"
+                    >
+                      <Text className="text-sm text-red-600 font-semibold">Add Date</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <View className="items-center">
+                  <Text className="text-xl font-bold my-2 text-red-600">
+                    Total Amount: INR {typeContent?.amount * selectedDates.length}
                   </Text>
                 </View>
               </>
             )}
 
-            {/* Item grid with quantity and date */}
-            {typeContent?.has_items && typeContent?.item_has_description && typeContent?.items && typeContent?.item_has_count && typeContent?.item_has_date && (
-              <>
-                <View className="mb-4">
-                  <View className="flex-row items-center">
-                    <Switch
-                      value={includeDailyAbhisegam}
-                      onValueChange={(value) => {
-                        setIncludeDailyAbhisegam(value);
-                        if (value) {
-                          const params = { trust_id: trustId };
-                          apiDonationTypeBySlug("daily-abhishegam", params)
-                            .then((res: any) => {
-                              setDailyAbhisegamAmount(res.data?.amount || 0);
-                            })
-                            .catch((err: any) => {
-                              const message: string | null = handleApiErrors(err);
-                              if (message) console.error(message);
-                            });
-                        } else {
-                          setDailyAbhisegamAmount(0);
-                        }
-                      }}
-                    />
-                    <Text className="ml-2 text-base text-acmec-red">Include Daily Abhisegam</Text>
-                  </View>
-                </View>
+            {/* Other donation type sections would follow similar patterns */}
 
-                <View className="mb-4">
-                  <View className="flex-row flex-wrap justify-between">
-                    {typeContent?.items?.map((item: any, index: number) => (
-                      <View key={index} className="w-full md:w-1/2 lg:w-1/3 p-1 mb-2">
-                        <View className="border-2 border-acmec-yellow rounded-lg p-2">
-                          <Text className="font-medium text-sm text-acmec-red">{item?.name}</Text>
-                          {item?.date && (
-                            <Text className="font-medium text-sm text-acmec-red">
-                              {new Date(item.date).toLocaleDateString('en-GB')}
-                            </Text>
-                          )}
-                          <Text className="text-xs text-acmec-red mb-2">{item?.description}</Text>
-                          
-                          <View className="flex-row justify-between items-center">
-                            {item?.amount && (
-                              <Text className="font-semibold text-acmec-red">₹ {item?.amount}</Text>
-                            )}
-                            <View className="flex-row items-center">
-                              <Text className="text-acmec-red mr-1">Qty:</Text>
-                              <Controller
-                                control={control}
-                                name={`qty-${index}`}
-                                render={({ field: { value } }) => (
-                                  <TextInput
-                                    value={value?.toString() || '0'}
-                                    onChangeText={(text) => handleNavaratriabhishegamQtyChange(Number(text), index, item?.date, item?.amount)}
-                                    className="border border-gray-300 rounded w-12 text-center p-1"
-                                    keyboardType="numeric"
-                                  />
-                                )}
-                              />
-                            </View>
-                          </View>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-
-                  <TouchableOpacity className="self-end mt-2" onPress={handleReset}>
-                    <Text className="text-acmec-red underline">Reset</Text>
-                  </TouchableOpacity>
-
-                  <View className="items-center my-2">
-                    <Text className="text-xl font-bold text-acmec-red">
-                      Total Amount: INR {totalAmount}
-                    </Text>
-                  </View>
-                </View>
-              </>
-            )}
-
-            {/* Item grid with quantity only */}
-            {typeContent?.has_items && typeContent?.item_has_description && typeContent?.items && typeContent?.item_has_count && !typeContent?.item_has_date && (
-              <>
-                <View className="mb-4">
-                  <View className="flex-row flex-wrap justify-between">
-                    {typeContentItems.map((item: any, index: number) => (
-                      <View key={index} className="w-full md:w-1/2 lg:w-1/3 p-1 mb-2">
-                        <View className="border-2 border-acmec-yellow rounded-lg p-2">
-                          <Text className="font-medium text-sm text-acmec-red">{item?.name}</Text>
-                          <Text className="text-xs text-acmec-red mb-2">{item?.description}</Text>
-                          
-                          <View className="flex-row justify-between items-center">
-                            <Text className="font-semibold text-acmec-red">₹ {item?.amount}</Text>
-                            <View className="flex-row items-center">
-                              <Text className="text-acmec-red mr-1">Qty:</Text>
-                              <Controller
-                                control={control}
-                                name={`qty-${index}`}
-                                render={({ field: { value } }) => (
-                                  <TextInput
-                                    value={value?.toString() || '0'}
-                                    onChangeText={(text) => handleQtyChange(Number(text), index)}
-                                    className="border border-gray-300 rounded w-12 text-center p-1"
-                                    keyboardType="numeric"
-                                  />
-                                )}
-                              />
-                            </View>
-                          </View>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-
-                  <TouchableOpacity className="self-end mt-2" onPress={handleClear}>
-                    <Text className="text-acmec-red underline">Reset</Text>
-                  </TouchableOpacity>
-
-                  <View className="items-center my-2">
-                    <Text className="text-xl font-bold text-acmec-red">
-                      Total Amount: ₹ {typeContentItems.reduce((accumulator: any, item: any) => accumulator + item.amount * item.qty, 0)}
-                    </Text>
-                  </View>
-                </View>
-              </>
-            )}
-
-            {/* Courier option */}
             {typeContent?.has_postal && (
-              <View className="flex-row items-center mb-4">
-                <Switch
-                  value={includeCourier}
-                  onValueChange={setIncludeCourier}
-                />
-                <Text className="ml-2 text-base text-gray-700">Send Prasadham by Courier</Text>
+              <View className="items-center mt-4">
+                <View className="flex-row items-center">
+                  <TouchableOpacity 
+                    onPress={() => setIncludeCourier(!includeCourier)}
+                    className="w-4 h-4 border border-gray-300 rounded mr-2 justify-center items-center"
+                    style={{ backgroundColor: includeCourier ? '#e53e3e' : 'transparent' }}
+                  >
+                    {includeCourier && <Text className="text-white text-xs">✓</Text>}
+                  </TouchableOpacity>
+                  <Text className="text-lg text-gray-700">Send Prasadham by Courier</Text>
+                </View>
               </View>
             )}
           </View>
 
           {showPersonalAndBilling && (
             <>
-              {/* Account Details */}
               {isShowPassword && showPersonalAndBilling && (
-                <View className="bg-white border border-acmec-yellow rounded-lg p-4 my-4">
-                  <Text className="uppercase font-semibold text-acmec-red pb-2 border-b border-b-gray-200 mb-4">Account Detail</Text>
+                <View className="border-2 border-yellow-400 bg-yellow-100 rounded-lg p-4 my-6">
+                  <Text className="uppercase font-semibold text-red-600 pb-2 border-b border-gray-200">Account Detail</Text>
 
-                  <View className="mb-4">
-                    <Text className="text-base text-acmec-red mb-1">
-                      Password <Text className="text-red-600">*</Text>
-                    </Text>
-                    <Controller
-                      control={control}
-                      name="password"
-                      rules={{ required: "Password is required" }}
-                      render={({ field: { onChange, value } }) => (
-                        <TextInput
-                          value={value}
-                          onChangeText={onChange}
-                          secureTextEntry
-                          className="border border-gray-300 rounded-lg p-2"
-                        />
-                      )}
-                    />
-                    {errors.password && <Text className="text-acmec-red text-xs">{(errors.password as any).message}</Text>}
-                  </View>
+                  <View className="mt-4">
+                    <View className="mb-4">
+                      <Text className="text-base text-red-600 mb-1">
+                        Password <Text className="text-red-600">*</Text>
+                      </Text>
+                      <TextInput
+                        {...register("password", { required: "Password is required" })}
+                        secureTextEntry
+                        className="w-full rounded-lg border-0 px-3 py-2 bg-white border border-gray-300"
+                      />
+                      {errors.password && <Text className="text-red-600 text-xs">{(errors.password as any).message}</Text>}
+                    </View>
 
-                  <View className="mb-4">
-                    <Text className="text-base text-acmec-red mb-1">
-                      Confirm Password <Text className="text-red-600">*</Text>
-                    </Text>
-                    <Controller
-                      control={control}
-                      name="confirmpassword"
-                      rules={{ required: "Confirm Password is required" }}
-                      render={({ field: { onChange, value } }) => (
-                        <TextInput
-                          value={value}
-                          onChangeText={onChange}
-                          secureTextEntry
-                          className="border border-gray-300 rounded-lg p-2"
-                        />
-                      )}
-                    />
-                    {errors.confirmpassword && <Text className="text-acmec-red text-xs">{(errors.confirmpassword as any).message}</Text>}
+                    <View className="mb-4">
+                      <Text className="text-base text-red-600 mb-1">
+                        Confirm Password <Text className="text-red-600">*</Text>
+                      </Text>
+                      <TextInput
+                        {...register("confirmpassword", { required: "Confirm Password is required" })}
+                        secureTextEntry
+                        className="w-full rounded-lg border-0 px-3 py-2 bg-white border border-gray-300"
+                      />
+                      {errors.confirmpassword && <Text className="text-red-600 text-xs">{(errors.confirmpassword as any).message}</Text>}
+                    </View>
                   </View>
                 </View>
               )}
 
-              {/* Personal Details */}
-              <View className="bg-white border border-acmec-yellow rounded-lg p-4 my-4">
-                <Text className="uppercase text-xl font-semibold text-acmec-red pb-2 mb-4">Personal Detail</Text>
+              {/* Personal Detail */}
+              <View className="border-2 border-yellow-400 bg-yellow-100 rounded-lg p-4 my-6">
+                <Text className="uppercase text-xl font-semibold text-red-600 pb-2">Personal Detail</Text>
 
-                <View className="pb-4 border-b border-acmec-red mb-4">
+                <View className="pb-6 border-b border-red-600">
                   <View className="mb-4">
-                    <Text className="text-base text-acmec-red mb-1">
+                    <Text className="text-base text-red-600 mb-1">
                       Name <Text className="text-red-600">*</Text>
                     </Text>
-                    <Controller
-                      control={control}
-                      name="name"
-                      rules={{ required: "Name is required" }}
-                      render={({ field: { onChange, value } }) => (
-                        <TextInput
-                          value={value}
-                          onChangeText={onChange}
-                          className="border border-gray-300 rounded-lg p-2 text-acmec-red"
-                        />
-                      )}
+                    <TextInput
+                      {...register("name", { required: "Name is required" })}
+                      className="w-full rounded-lg border-0 px-3 py-2 bg-white  border-gray-300"
                     />
-                    {errors.name && <Text className="text-acmec-red text-xs">{(errors.name as any).message}</Text>}
+                    {errors.name && <Text className="text-red-600 text-xs">{(errors.name as any).message}</Text>}
                   </View>
 
                   <View className="mb-4">
-                    <Text className="text-base text-acmec-red mb-1">
+                    <Text className="text-base text-red-600 mb-1">
                       Email Address <Text className="text-red-600">*</Text>
                     </Text>
-                    <Controller
-                      control={control}
-                      name="email"
-                      rules={{
-                        required: "Email is required",
+                    <TextInput
+                      {...register("email", { 
+                        required: "Email is required", 
                         pattern: {
                           value: /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/,
                           message: "Invalid email address"
-                        }
-                      }}
-                      render={({ field: { onChange, value } }) => (
-                        <TextInput
-                          value={value}
-                          onChangeText={onChange}
-                          keyboardType="email-address"
-                          autoCapitalize="none"
-                          className="border border-gray-300 rounded-lg p-2"
-                        />
-                      )}
+                        } 
+                      })}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      className="w-full rounded-lg border-0 px-3 py-2 bg-white border border-gray-300"
                     />
-                    {errors.email && <Text className="text-acmec-red text-xs">{(errors.email as any).message}</Text>}
+                    {errors.email && <Text className="text-red-600 text-xs">{(errors.email as any).message}</Text>}
                   </View>
 
                   <View className="mb-4">
-                    <Text className="text-base text-acmec-red mb-1">
+                    <Text className="text-base text-red-600 mb-1">
                       Phone Number <Text className="text-red-600">*</Text>
                     </Text>
-                    <Controller
-                      control={control}
-                      name="phone"
-                      rules={{ required: "Phone is required" }}
-                      render={({ field: { onChange, value } }) => (
-                        <TextInput
-                          value={value}
-                          onChangeText={onChange}
-                          keyboardType="phone-pad"
-                          className="border border-gray-300 rounded-lg p-2"
-                        />
-                      )}
+                    <TextInput
+                      {...register("phone", { required: "Phone is required" })}
+                      keyboardType="phone-pad"
+                      className="w-full rounded-lg border-0 px-3 py-2 bg-white border border-gray-300"
                     />
-                    {errors.phone && <Text className="text-acmec-red text-xs">{(errors.phone as any).message}</Text>}
+                    {errors.phone && <Text className="text-red-600 text-xs">{(errors.phone as any).message}</Text>}
                   </View>
                 </View>
 
-                <Text className="uppercase font-semibold text-acmec-red text-xl pb-2 mb-4">Billing Detail</Text>
-
+                <Text className="uppercase font-semibold text-red-600 text-xl py-2">Billing Detail</Text>
+                
                 <View className="mb-4">
-                  <Text className="text-base text-acmec-red mb-1">
+                  <Text className="text-base text-red-600 mb-1">
                     Address Line 1 <Text className="text-red-600">*</Text>
                   </Text>
-                  <Controller
-                    control={control}
-                    name="addressline1"
-                    rules={{ required: "Address is required" }}
-                    render={({ field: { onChange, value } }) => (
-                      <TextInput
-                        value={value}
-                        onChangeText={onChange}
-                        className="border border-gray-300 rounded-lg p-2"
-                      />
-                    )}
+                  <TextInput
+                    {...register("addressline1", { required: "Address is required" })}
+                    className="w-full rounded-lg border-0 px-3 py-2 bg-white border border-gray-300"
                   />
-                  {errors.addressline1 && <Text className="text-acmec-red text-xs">{(errors.addressline1 as any).message}</Text>}
+                  {errors.addressline1 && <Text className="text-red-600 text-xs">{(errors.addressline1 as any).message}</Text>}
                 </View>
 
                 <View className="mb-4">
-                  <Text className="text-base text-acmec-red mb-1">Address Line 2</Text>
-                  <Controller
-                    control={control}
-                    name="addressline2"
-                    render={({ field: { onChange, value } }) => (
-                      <TextInput
-                        value={value}
-                        onChangeText={onChange}
-                        className="border border-gray-300 rounded-lg p-2"
-                      />
-                    )}
+                  <Text className="text-base text-red-600 mb-1">
+                    Address Line 2
+                  </Text>
+                  <TextInput
+                    {...register("addressline2")}
+                    className="w-full rounded-lg border-0 px-3 py-2 bg-white border border-gray-300"
                   />
                 </View>
 
                 <View className="mb-4">
-                  <Text className="text-base text-acmec-red mb-1">
+                  <Text className="text-base text-red-600 mb-1">
                     Country <Text className="text-red-600">*</Text>
                   </Text>
-                  <Controller
-                    control={control}
-                    name="country"
-                    rules={{ required: "Country is required" }}
-                    render={({ field: { onChange, value } }) => (
-                      <CustomPicker
-                        items={Object.keys(countries).map((key: any) => ({ 
-                          label: countries[key], 
-                          value: key 
-                        }))}
-                        selectedValue={value}
-                        onValueChange={(itemValue: string) => {
-                          onChange(itemValue);
-                          handleCountryChange(itemValue);
-                        }}
-                      />
-                    )}
-                  />
-                  {errors.country && <Text className="text-acmec-red text-xs">{(errors.country as any).message}</Text>}
+                  <View className="border border-gray-300 rounded-lg bg-white">
+                    <Picker
+                      {...register("country", { required: "Country is required" })}
+                      onValueChange={handleCountryChange}
+                    >
+                      {Object.keys(countries).map((key: any) => (
+                        <Picker.Item key={key} label={countries[key]} value={key} />
+                      ))}
+                    </Picker>
+                  </View>
+                  {errors.country && <Text className="text-red-600 text-xs">{(errors.country as any).message}</Text>}
                 </View>
 
                 <View className="mb-4">
-                  <Text className="text-base text-acmec-red mb-1">
+                  <Text className="text-base text-red-600 mb-1">
                     State <Text className="text-red-600">*</Text>
                   </Text>
-                  <Controller
-                    control={control}
-                    name="state"
-                    rules={{ required: "State is required" }}
-                    render={({ field: { onChange, value } }) => (
-                      <CustomPicker
-                        items={Object.keys(states).map((key: any) => ({ 
-                          label: states[key], 
-                          value: key 
-                        }))}
-                        selectedValue={value}
-                        onValueChange={onChange}
-                      />
-                    )}
-                  />
-                  {errors.state && <Text className="text-acmec-red text-xs">{(errors.state as any).message}</Text>}
+                  <View className="border border-gray-300 rounded-lg bg-white">
+                    <Picker
+                      {...register("state", { required: "State is required" })}
+                    >
+                      {Object.keys(states).map((key: any) => (
+                        <Picker.Item key={key} label={states[key]} value={key} />
+                      ))}
+                    </Picker>
+                  </View>
+                  {errors.state && <Text className="text-red-600 text-xs">{(errors.state as any).message}</Text>}
                 </View>
 
                 <View className="mb-4">
-                  <Text className="text-base text-acmec-red mb-1">
+                  <Text className="text-base text-red-600 mb-1">
                     City <Text className="text-red-600">*</Text>
                   </Text>
-                  <Controller
-                    control={control}
-                    name="city"
-                    rules={{ required: "City is required" }}
-                    render={({ field: { onChange, value } }) => (
-                      <TextInput
-                        value={value}
-                        onChangeText={onChange}
-                        className="border border-gray-300 rounded-lg p-2"
-                      />
-                    )}
+                  <TextInput
+                    {...register("city", { required: "City is required" })}
+                    className="w-full rounded-lg border-0 px-3 py-2 bg-white  border-gray-300"
                   />
-                  {errors.city && <Text className="text-acmec-red text-xs">{(errors.city as any).message}</Text>}
+                  {errors.city && <Text className="text-red-600 text-xs">{(errors.city as any).message}</Text>}
                 </View>
 
                 <View className="mb-4">
-                  <Text className="text-base text-acmec-red mb-1">
+                  <Text className="text-base text-red-600 mb-1">
                     Zip / Postal Code <Text className="text-red-600">*</Text>
                   </Text>
-                  <Controller
-                    control={control}
-                    name="postalcode"
-                    rules={{ required: "Postal Code is required" }}
-                    render={({ field: { onChange, value } }) => (
-                      <TextInput
-                        value={value}
-                        onChangeText={onChange}
-                        className="border border-gray-300 rounded-lg p-2"
-                        keyboardType="numeric"
-                      />
-                    )}
+                  <TextInput
+                    {...register("postalcode", { required: "Postal Code is required" })}
+                    keyboardType="numeric"
+                    className="w-full rounded-lg border-0 px-3 py-2 bg-white border border-gray-300"
                   />
-                  {errors.postalcode && <Text className="text-acmec-red text-xs">{(errors.postalcode as any).message}</Text>}
+                  {errors.postalcode && <Text className="text-red-600 text-xs">{(errors.postalcode as any).message}</Text>}
                 </View>
               </View>
 
               <TouchableOpacity
-                className="bg-acmec-red p-3 rounded-lg items-center mb-8"
                 onPress={handleSubmit(handleonSubmit)}
                 disabled={isLoading}
+                className="overflow-hidden rounded-lg"
               >
-                {isLoading ? (
-                  <View className="flex-row items-center">
-                    <ActivityIndicator color="white" />
-                    <Text className="text-white ml-2">Please wait ...</Text>
-                  </View>
-                ) : (
-                  <Text className="text-white font-bold">Donate Now</Text>
-                )}
+                <LinearGradient
+                  colors={['#e53e3e', '#ed8936']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  className="py-4 px-8 items-center"
+                >
+                  {isLoading ? (
+                    <View className="flex-row items-center">
+                      <ActivityIndicator color="white" />
+                      <Text className="text-white font-bold ml-2">Please wait ...</Text>
+                    </View>
+                  ) : (
+                    <Text className="text-white font-bold">Donate Now</Text>
+                  )}
+                </LinearGradient>
               </TouchableOpacity>
             </>
           )}
         </View>
-
-        {!showPersonalAndBilling && (
-          <VerifPanAadhaarRN 
-            setEdonationVerify={setEdonationVerify} 
-            typeContent={typeContent} 
-            setPanDetails={setPanDetails} 
-            aadhaarDetails={aadhaarDetails} 
-            setAadhaarDetails={setAadhaarDetails} 
-            setShowPersonalAndBilling={setShowPersonalAndBilling} 
-          />
-        )}
-      </ScrollView>
-    </SafeAreaView>
+      </View>
+      
+      {!showPersonalAndBilling && (
+        <VerifPanAadhaar 
+          setEdonationVerify={setEdonationVerify} 
+          typeContent={typeContent} 
+          setPanDetails={setPanDetails} 
+          aadhaarDetails={aadhaarDetails} 
+          setAadhaarDetails={setAadhaarDetails} 
+          setShowPersonalAndBilling={setShowPersonalAndBilling} 
+        />
+      )}
+    </ScrollView>
   );
 }

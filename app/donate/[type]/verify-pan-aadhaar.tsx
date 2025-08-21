@@ -7,12 +7,12 @@ import { Controller, useForm } from "react-hook-form";
 import { ActivityIndicator, Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 import {
-    apiAadhaarGenerate,
-    apiAadhaarVerify,
-    apiMobileGenerate,
-    apiMobileVerify,
-    apiPanVerify,
-    apiUserProfile,
+  apiAadhaarGenerate,
+  apiAadhaarVerify,
+  apiMobileGenerate,
+  apiMobileVerify,
+  apiPanVerify,
+  apiUserProfile,
 } from "@/src/services/api";
 import { handleApiErrors } from "@/src/utils/helper/api.helper";
 
@@ -25,7 +25,7 @@ type Props = {
   setEdonationVerify?: (v: boolean) => void;
 };
 
-export default function VerifPanAadhaarRN({
+export default function VerifPanAadhaar({
   setShowPersonalAndBilling = () => {},
   setAadhaarDetails = () => {},
   aadhaarDetails,

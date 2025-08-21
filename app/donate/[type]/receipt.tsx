@@ -1,24 +1,25 @@
-// app/donate/[type]/receipt.tsx
+// components/receipt.tsx
 import React from "react";
 import { ActivityIndicator, Text, TouchableOpacity, View } from "react-native";
-import { CheckCircleIcon } from "react-native-heroicons/outline";
 
-type Props = {
-  isGetReceiptLoading: boolean;
+type DonateReceiptProps = {
+  setIsReceiptLoading: (val: boolean) => void;
+  isReceiptLoading: boolean;
   getDonationReceipt: () => void;
 };
 
 export default function DonateReceipt({
-  isGetReceiptLoading,
+  setIsReceiptLoading,
+  isReceiptLoading,
   getDonationReceipt,
-}: Props) {
+}: DonateReceiptProps) {
   return (
-    <View className="flex-1 bg-gray-50 px-4 py-16">
-      {/* Success Message */}
-      <View className="flex-col items-center text-center space-y-3">
-        <View className="items-center justify-center bg-red-100 p-4 rounded-full">
-          <CheckCircleIcon size={48} color="#dc2626" /> 
-          {/* red-600 color */}
+    <View className="max-w-md mx-auto px-4 py-16">
+      {/* Top Section */}
+      <View className="flex flex-col items-center text-center space-y-3">
+        <View className="flex items-center justify-center bg-red-500/10 p-4 rounded-full">
+          {/* You might need to replace this with an icon from react-native-vector-icons */}
+          <Text className="text-red-600 text-4xl">✓</Text>
         </View>
 
         <Text className="text-2xl font-semibold text-gray-800">Thank you!</Text>
@@ -30,20 +31,23 @@ export default function DonateReceipt({
         </Text>
       </View>
 
-      {/* Button */}
-      <View className="items-center justify-center mt-7">
-        {!isGetReceiptLoading ? (
+      {/* Button Section */}
+      <View className="flex items-center justify-center mt-7">
+        {!isReceiptLoading ? (
           <TouchableOpacity
             onPress={getDonationReceipt}
-            className="flex-row items-center bg-red-600 rounded-lg px-8 py-3"
+            className="flex-row items-center gap-3 bg-red-600 px-8 py-2 rounded-lg"
           >
             <Text className="text-white font-bold">Click here to get receipt</Text>
           </TouchableOpacity>
         ) : (
-          <View className="flex-row items-center bg-yellow-500 rounded-lg px-8 py-3">
-            <ActivityIndicator color="#fff" size="small" className="mr-2" />
+          <TouchableOpacity
+            disabled
+            className="flex-row items-center gap-3 bg-orange-500 px-8 py-2 rounded-lg"
+          >
+            <ActivityIndicator size="small" color="#fff" />
             <Text className="text-white font-bold">Please wait ...</Text>
-          </View>
+          </TouchableOpacity>
         )}
       </View>
     </View>

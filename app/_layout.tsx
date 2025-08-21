@@ -1,7 +1,6 @@
-
 import { Slot } from "expo-router";
 import React from "react";
-import { View } from "react-native";
+import { SafeAreaView, ScrollView, View, useWindowDimensions } from "react-native";
 import "../global.css";
 
 import Footer from "@/src/components/Footer";
@@ -13,23 +12,56 @@ import {
 import { AuthProvider } from "@/src/context/auth-context";
 
 export default function RootLayout() {
+  const { width } = useWindowDimensions();
+
+  // Example responsive logic
+  const isTablet = width >= 768;
+  const isDesktop = width >= 1024;
+
   return (
     <AuthProvider>
-  <View style={{ flex: 1, backgroundColor: "#FD580B1F" }}>
-    {/* Header pieces */}
-    <HeaderFollowBar />
-    <HeaderLogoBar />
-    <HeaderProfileBar />
+      <SafeAreaView style={{ flex: 1, backgroundColor: "#FD580B1F" }}>
+        <ScrollView
+          contentContainerStyle={{
+            flexGrow: 1,
+            justifyContent: "space-between",
+          }}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header */}
+          <View
+            style={{
+              // paddingHorizontal: isDesktop ? 32 : isTablet ? 24 : 12,
+              // paddingVertical: isTablet ? 16 : 8,
+            }}
+          >
+            <HeaderFollowBar />
+            <HeaderLogoBar />
+            <HeaderProfileBar />
+          </View>
 
-    {/* Main content rendered by current route */}
-    <View style={{ flex: 1 }}>
-      <Slot />
-    </View>
+          {/* Main content (page content will adjust height automatically) */}
+          <View
+            style={{
+              flex: 1,
+              paddingHorizontal: isDesktop ? 40 : isTablet ? 24 : 12,
+              marginVertical: 12,
+            }}
+          >
+            <Slot />
+          </View>
 
-    {/* Footer */}
-    <Footer />
-  </View>
-</AuthProvider>
-
+          {/* Footer */}
+          <View
+            style={{
+              paddingHorizontal: isDesktop ? 32 : isTablet ? 20 : 10,
+              paddingBottom: isTablet ? 20 : 10,
+            }}
+          >
+            <Footer />
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </AuthProvider>
   );
 }

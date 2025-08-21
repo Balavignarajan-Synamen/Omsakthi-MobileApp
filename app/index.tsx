@@ -94,8 +94,8 @@ export default function HomeScreen() {
   }
 
   return (
-    <FlatList
-      ListHeaderComponent={
+    // <FlatList
+      // ListHeaderComponent={
         // <View className="flex-1 max-h he bg-[#FD580B1F]">
         <SafeAreaView className="flex-1 border-none bg-[#FD580B1F]">
           {/* Section 1: Trusts */}
@@ -133,7 +133,7 @@ export default function HomeScreen() {
                           />
                         ) : (
                           <View className="mb-3 h-16 w-16 items-center justify-center rounded-full bg-acmec-yellow">
-                            <FontAwesome name="heart-o" size={18} color="red" />  
+                            <FontAwesome name="heart-o" size={18} color="red" />
                           </View>
                         )}
                       </View>
@@ -146,14 +146,26 @@ export default function HomeScreen() {
                       </Text>
                       <View className="mt-4 items-center">
                         <LinearGradient
-                          // colors={['#fff700f2', '#ff4d4df2']}
-                          colors={['#fff700f2', '#ff6600f2', '#ff3333f2']}
-
+                          colors={['#FFD600', '#ff6500']}
                           end={{ x: 1, y: 1 }}
-                          className="rounded-2xl p-2 "
+                          style={{ padding: 4, borderRadius: 12 }} // <-- border radius here
                         >
-                          <View className="flex-row items-center rounded-xl  px-6 py-2">
-                            <Text className="mr-2 font-bold text-white text-xl">
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              paddingHorizontal: 24,
+                              paddingVertical: 8,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                marginRight: 8,
+                                fontSize: 18,
+                                fontWeight: 'bold',
+                                color: '#fff',
+                              }}
+                            >
                               Donate Now
                             </Text>
                             <FontAwesome
@@ -174,6 +186,14 @@ export default function HomeScreen() {
           {/* Section 2: Testimonials */}
           <Text className="my-6 text-center text-xl font-bold text-acmec-red md:text-3xl">
             Amma's Messages
+          </Text>
+
+          <Text
+            className="animate-slide-up mx-auto  my-4 text-center text-lg text-gray-700"
+            style={{ animationDelay: '0.2s' }}
+          >
+            Inspiring words of wisdom from Amma to guide us on our spiritual
+            journey
           </Text>
           {isTestimonialLoading ? (
             <ActivityIndicator size="large" className="my-6" />
@@ -205,9 +225,9 @@ export default function HomeScreen() {
             </Swiper>
           )}
         </SafeAreaView>
-      }
-      data={[]} // no list, just using FlatList for scroll
-      renderItem={null}
-    />
-  )
-}
+      )}
+      // data={[]} // no list, just using FlatList for scroll
+      // renderItem={null}
+    // />
+  // )
+// }
