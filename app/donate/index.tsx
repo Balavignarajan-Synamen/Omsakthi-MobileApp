@@ -24,7 +24,7 @@ export default function Donate() {
   // ✅ Define breadcrumb here
   const breadcrumb = {
     title: 'Donate',
-    path: [{ label: 'Home', link: 'index' }, { label: 'Donate' }],
+    path: [{ label: 'Home', link: '/' }, { label: 'Donate' }],
   }
 
   useEffect(() => {

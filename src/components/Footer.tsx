@@ -1,5 +1,6 @@
 // components/Footer.tsx
 import { LinearGradient } from 'expo-linear-gradient';
+import { Link } from 'expo-router';
 import { Image, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 
 
@@ -41,6 +42,45 @@ export default function Footer() {
         cents of land in Melmaruvathur.
       </Text>
 
+
+      <View style={{ flexDirection: isTablet ? "column" : "row", gap: 12, marginVertical: 16, width: "100%", justifyContent: "center", alignItems: "center" }}>
+        <Link
+          href="/"
+          style={{
+        backgroundColor: "#fff",
+        color: "#a7150b",
+        borderRadius: 8,
+        textTransform: "uppercase",
+        fontWeight: "600",
+        fontSize: isTablet ? 16 : 14,
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        width: isTablet ? "60%" : "45%",
+        textAlign: "center",
+        marginBottom: isTablet ? 12 : 0,
+          }}
+        >
+          Donate Us
+        </Link>
+        <Link
+          href="/contact"
+          style={{
+        backgroundColor: "#fff",
+        color: "#a7150b",
+        borderRadius: 8,
+        textTransform: "uppercase",
+        fontWeight: "600",
+        fontSize: isTablet ? 16 : 14,
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        width: isTablet ? "60%" : "45%",
+        textAlign: "center",
+          }}
+        >
+          Contact Us
+        </Link>
+      </View>
+
       {/* Copyright */}
       <Text
         style={[
@@ -61,20 +101,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 20,
-  backgroundColor: 'rgba(167, 21, 11, 1)', 
-
+    width: "100%",
   },
   logoContainer: {
     marginBottom: 10,
   },
   aboutText: {
     textAlign: "center",
-    color: "#fff", // gray-700
+    color: "#fff",
     lineHeight: 22,
     marginBottom: 10,
+    fontWeight: "bold",
   },
   copyText: {
     textAlign: "center",
-    color: "#fff", // gray-500
+    // color: "#fff",
+    fontSize: 24,
+    fontWeight: "bold",
+    backgroundColor: "yellow",
+    width: "100%",
+    paddingVertical: 8,
   },
 });

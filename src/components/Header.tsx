@@ -1,7 +1,7 @@
 // src/components/HeaderSections.tsx
 import { FontAwesome } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { Link } from "expo-router";
+import { Link, router } from "expo-router";
 import React, { useState } from "react";
 import {
   Image,
@@ -111,15 +111,15 @@ export function HeaderProfileBar() {
 
       <Sidebar
         isVisible={isSidebarVisible}
-        onClose={toggleSidebar}
         onLogin={() => {
-          console.log("Login pressed");
           setIsSidebarVisible(false);
+          router.push("/login");
         }}
         onSignup={() => {
-          console.log("Signup pressed");
           setIsSidebarVisible(false);
+          console.log("Signup pressed");
         }}
+        onClose={() => setIsSidebarVisible(false)}
       />
     </>
   );
