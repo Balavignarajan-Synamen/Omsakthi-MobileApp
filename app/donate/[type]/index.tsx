@@ -1,47 +1,126 @@
-import Breadcrumb from '@/src/components/breadcrumb';
-import { useAuth } from '@/src/context/auth-context';
-import { useTrust } from '@/src/context/trust-context';
+import Breadcrumb from '@/src/components/breadcrumb'
+import { useAuth } from '@/src/context/auth-context'
 import {
   apiCreateDonations,
   apiDonationTypeBySlug,
   apiGetCountries,
   apiGetReceipt,
   apiGetStates,
-  apiRazorpayCallback,
   apiRazorpayCreate,
   apiUserProfile,
-  apiUserRegister
-} from '@/src/services/api';
-import { handleApiErrors } from '@/src/utils/helper/api.helper';
-import { generateUUID } from '@/src/utils/helper/glober.helper';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { Picker } from '@react-native-picker/picker';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { useFieldArray, useForm } from 'react-hook-form';
-import { ActivityIndicator, Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import DonateCheckout from './checkout';
-import DonateReceipt from './receipt';
-import VerifPanAadhaar from './verify-pan-aadhaar';
+  apiUserRegister,
+} from '@/src/services/api'
+import { handleApiErrors } from '@/src/utils/helper/api.helper'
+import { generateUUID } from '@/src/utils/helper/glober.helper'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import DateTimePicker from '@react-native-community/datetimepicker'
+import { Link, useLocalSearchParams, useRouter } from 'expo-router'
+import { StatusBar } from 'expo-status-bar'
+import React, { useEffect, useState } from 'react'
+import { Controller, useFieldArray, useForm } from 'react-hook-form'
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
+  Platform,
+  ScrollView,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import DonateCheckout from './checkout'
+import DonateReceipt from './receipt'
+import VerifPanAadhaarRN from './verify-pan-aadhaar'
+
+// Custom Picker component to replace @react-native-picker/picker
+const CustomPicker = ({
+  items,
+  selectedValue,
+  onValueChange,
+  enabled = true,
+  placeholder = 'Select an option',
+}: any) => {
+  const [modalVisible, setModalVisible] = useState(false)
+
+  const selectedItem = items.find((item: any) => item.value === selectedValue)
+
+  return (
+    <>
+      <TouchableOpacity
+        onPress={() => setModalVisible(true)}
+        className={`rounded-lg border border-gray-300 p-3 ${enabled ? '' : 'bg-gray-100'}`}
+        disabled={!enabled}
+      >
+        <Text className={selectedValue ? 'text-black' : 'text-gray-400'}>
+          {selectedItem ? selectedItem.label : placeholder}
+        </Text>
+      </TouchableOpacity>
+
+      <Modal
+        visible={modalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View className="flex-1 justify-end bg-black/50">
+          <View className="max-h-3/4 rounded-t-3xl bg-white p-4">
+            <View className="mb-4 flex-row items-center justify-between">
+              <Text className="text-lg font-semibold">Select an option</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <Text className="text-lg text-acmec-red">Done</Text>
+              </TouchableOpacity>
+            </View>
+
+            <FlatList
+              data={items}
+              keyExtractor={(_, index) => index.toString()}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  onPress={() => {
+                    onValueChange(item.value)
+                    setModalVisible(false)
+                  }}
+                  className={`border-b border-gray-100 p-3 ${
+                    selectedValue === item.value ? 'bg-acmec-red/10' : ''
+                  }`}
+                >
+                  <Text
+                    className={
+                      selectedValue === item.value
+                        ? 'font-semibold text-acmec-red'
+                        : 'text-black'
+                    }
+                  >
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
+    </>
+  )
+}
 
 export default function DonateType() {
-  const trustContext = useTrust();
-  // const { selectedTrust } = trustContext || {}; // Add null checking
-  const { selectedTrust, isLoading: isTrustLoading } = trustContext || {};
-  
-  const router = useRouter();
-  const params = useLocalSearchParams();
-  const type = params.type as string;
-  const trustId = params.trust_id as string;
-  
+  const params = useLocalSearchParams()
+  const type = params.type as string
+  const trustId = params.trust_id as string
+  const router = useRouter()
+  const { triggerAuth, isAuthenticated } = useAuth()
+
   const [breadcrumb, setBreadcrumb] = useState({
-    title: "",
+    title: 'Donate',
     path: [
-      { label: "Home", link: "/" },
-      { label: "Donate", link: selectedTrust?.slug ? `/${selectedTrust.slug}/donate` : "/donate" }, // Add fallback
+      { label: 'Home', link: 'index' },
+      { label: 'Donate', link: `/donate?trust_id=${trustId}` },
     ],
-  });
+  })
 
   const {
     register,
@@ -52,251 +131,267 @@ export default function DonateType() {
     setValue,
     trigger,
     unregister,
-  } = useForm({});
-  
-  const { triggerAuth, isAuthenticated } = useAuth();
+    watch,
+  } = useForm({})
 
-  const [screenType, setScreenType] = useState<"form" | "checkout" | "receipt">("form");
-  const [isTypeContentLoading, setIsTypeContentLoading] = useState<boolean>(true);
-  const [typeContent, setTypeContent] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [showPersonalAndBilling, setShowPersonalAndBilling] = useState<boolean>(true);
-  const [typeContentItems, setTypeContentItems] = useState<any>([]);
-  const [countries, setCountries] = useState<any>({});
-  const [states, setStates] = useState<any>({});
-  const [aadhaarDetails, setAadhaarDetails] = useState<any>({});
-  const [panDetails, setPanDetails] = useState<any>({});
-  const [donationInfo, setDonationInfo] = useState<any>({});
-  const [changedItems, setChangedItems] = useState<number[]>([]);
-  const [isCheckoutLoading, setIsCheckoutLoading] = useState<boolean>(false);
-  const [isReceiptLoading, setIsReceiptLoading] = useState<boolean>(false);
-  const [uuid, setUuid] = useState<string>("");
-  const [isShowPassword, setIsShowPassword] = useState<boolean>(false);
-  const [isAuthStatus, setIsAuthStatus] = useState<boolean>(true);
-  const [selectedDates, setSelectedDates] = useState<any>([new Date()]);
-  const [includeCourier, setIncludeCourier] = useState(false);
-  const [selectedAmount, setSelectedAmount] = useState<number>(0);
-  const [qty, setQty] = useState<number>(1);
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-  const [eDonationVerify, setEdonationVerify] = useState<boolean>(false);
-  const [latcharchanaiAmount, setLatcharchanaiAmount] = useState<any>(0);
-  const [includeDailyAbhisegam, setIncludeDailyAbhisegam] = useState(false);
-  const [dailyAbhisegamAmount, setDailyAbhisegamAmount] = useState(0);
-  const [dateError, setDateError] = useState(false);
-  const [isQtyChanged, setIsQtyChanged] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState<number | null>(null);
+  const [screenType, setScreenType] = useState<'form' | 'checkout' | 'receipt'>(
+    'form',
+  )
+  const [isTypeContentLoading, setIsTypeContentLoading] =
+    useState<boolean>(true)
+  const [typeContent, setTypeContent] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [showPersonalAndBilling, setShowPersonalAndBilling] =
+    useState<boolean>(true)
+  const [typeContentItems, setTypeContentItems] = useState<any>([])
+  const [countries, setCountries] = useState<any>({})
+  const [states, setStates] = useState<any>({})
+  const [aadhaarDetails, setAadhaarDetails] = useState<any>({})
+  const [panDetails, setPanDetails] = useState<any>({})
+  const [donationInfo, setDonationInfo] = useState<any>({})
+  const [changedItems, setChangedItems] = useState<number[]>([])
+  const [isCheckoutLoading, setIsCheckoutLoading] = useState<boolean>(false)
+  const [isReceiptLoading, setIsReceiptLoading] = useState<boolean>(false)
+  const [uuid, setUuid] = useState<string>('')
+  const [isShowPassword, setIsShowPassword] = useState<boolean>(false)
+  const [isAuthStatus, setIsAuthStatus] = useState<boolean>(true)
+  const [selectedDates, setSelectedDates] = useState<any>([new Date()])
+  const [includeCourier, setIncludeCourier] = useState(false)
+  const [selectedAmount, setSelectedAmount] = useState<number>(0)
+  const [qty, setQty] = useState<number>(1)
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
+  const [eDonationVerify, setEdonationVerify] = useState<boolean>(false)
+  const [latcharchanaiAmount, setLatcharchanaiAmount] = useState<any>(0)
+  const [includeDailyAbhisegam, setIncludeDailyAbhisegam] = useState(false)
+  const [dailyAbhisegamAmount, setDailyAbhisegamAmount] = useState(0)
+  const [dateError, setDateError] = useState(false)
+  const [isQtyChanged, setIsQtyChanged] = useState(false)
+  const [showDatePicker, setShowDatePicker] = useState<number | null>(null)
+  const [userAuthStatus, setUserAuthStatus] = useState<boolean>(false)
+  const [fixedAmount, setFixedAmount] = useState<number | null>(null)
 
   const { fields, append, remove } = useFieldArray({
     control,
-    name: "members",
-  });
+    name: 'members',
+  })
 
-  const maxMembers = 5;
-  const canAddMore = fields.length < maxMembers;
+  const maxMembers = 5
+  const canAddMore = fields.length < maxMembers
 
-  // Show loading if trust context is not available yet
-  if (!trustContext) {
-    return (
-      <View className="flex-1 justify-center items-center p-4">
-        <ActivityIndicator size="large" color="#e53e3e" />
-        <Text className="mt-4 text-gray-600">Loading trust information...</Text>
-      </View>
-    );
-  }
+  // Watch form values
+  const watchAmount = watch('amount')
+  const watchDonationType = watch('donatetype')
 
   useEffect(() => {
-    if (type && selectedTrust) {
-      donationTypes(type);
+    if (type) donationTypes(type)
+  }, [type])
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const authStatus = await AsyncStorage.getItem('acmec.user_auth_status')
+        console.log('Auth status from storage:', authStatus)
+        if (authStatus === 'true') {
+          setIsAuthStatus(false)
+          setUserAuthStatus(true)
+        } else {
+          setIsAuthStatus(true)
+          setUserAuthStatus(false)
+        }
+      } catch (err) {
+        console.error('Error reading auth status:', err)
+      }
     }
-  }, [type, selectedTrust]);
+
+    checkAuth()
+  }, [])
 
   useEffect(() => {
-    const authStatus = localStorage.getItem("acmec.user_auth_status");
-    if (authStatus) {
-      setIsAuthStatus(false);
-    } else {
-      setIsAuthStatus(true);
-    }
-  }, []);
+    getCountries()
+  }, [])
 
   useEffect(() => {
-    getCountries();
-  }, []);
+    setValue('name', aadhaarDetails?.data?.user_full_name)
+  }, [aadhaarDetails])
 
   useEffect(() => {
-    setValue("name", aadhaarDetails?.data?.user_full_name);
-    setValue("postalcode", aadhaarDetails?.data?.address_zip);
-    const house = aadhaarDetails?.data?.user_address?.house || "";
-    const street = aadhaarDetails?.data?.user_address?.street || "";
-    const post = aadhaarDetails?.data?.user_address?.po || "";
-    const vtc = aadhaarDetails?.data?.user_address?.vtc || "";
-    setValue("addressline1", `${house}`.trim());
-    setValue("addressline2", `${street} , ${vtc}`.trim());
-    setValue("city", aadhaarDetails?.data?.user_address?.dist);
-  }, [aadhaarDetails]);
+    setValue('name', panDetails?.data?.user_full_name)
+  }, [panDetails])
 
   useEffect(() => {
-    setValue("name", panDetails?.data?.user_full_name);
-    setValue("postalcode", panDetails?.data?.user_address?.zip);
-    const line_1 = panDetails?.data?.user_address?.line_1 || "";
-    const street = panDetails?.data?.user_address?.street_name || "";
-    const line_2 = panDetails?.data?.user_address?.line_2 || "";
-    setValue("addressline1", `${line_1}  ${street}`.trim());
-    setValue("addressline2", `${line_2}`.trim());
-    setValue("city", panDetails?.data?.user_address?.city);
-  }, [panDetails]);
-
-  useEffect(() => {
-    let items = typeContent?.items || [];
+    let items = typeContent?.items || []
     items = items.map((item: any) => ({
       name: item.name,
       description: item.description,
       amount: item.amount,
       qty: 0,
       date: item?.date,
-    }));
+    }))
 
-    setTypeContentItems(items);
-  }, [typeContent]);
+    setTypeContentItems(items)
+  }, [typeContent])
 
   const donationTypes = (slug: string) => {
-    if (!selectedTrust) return;
-    
-    apiDonationTypeBySlug(slug, selectedTrust.id)
+    const params = { trust_id: trustId }
+    apiDonationTypeBySlug(slug, params)
       .then((res: any) => {
-        setIsTypeContentLoading(false);
-        setTypeContent(res.data);
-        setLatcharchanaiAmount(res.data?.amount);
+        setIsTypeContentLoading(false)
+        setTypeContent(res.data)
+        setLatcharchanaiAmount(res.data?.amount)
+
+        // Set fixed amount if applicable
+        if (
+          res.data?.amount &&
+          !res.data?.minimum_amount &&
+          !res.data?.has_items &&
+          !res.data?.has_members
+        ) {
+          setFixedAmount(res.data.amount)
+          setValue('amount', res.data.amount.toString())
+        }
 
         setBreadcrumb({
           title: res.data.name,
           path: [
-            { label: "Home", link: "/" },
-            { label: "Donate", link: `/${selectedTrust.slug}/donate` },
-            { label: res.data.name, link: "" },
+            { label: 'Home', link: '/' },
+            { label: 'Donate', link: `/donate?trust_id=${trustId}` },
+            { label: res.data.name, link: '' },
           ],
-        });
-        
-        if (res.data?.mode === "e_donation") {
-          setShowPersonalAndBilling(false);
+        })
+        if (res.data?.mode === 'e_donation') {
+          setShowPersonalAndBilling(false)
         }
 
-        if (res.data?.mode === "eighty_g") {
-          setShowPersonalAndBilling(false);
+        if (res.data?.mode === 'eighty_g') {
+          setShowPersonalAndBilling(false)
         }
       })
       .catch((err: any) => {
-        const message: string | null = handleApiErrors(err);
-        if (message) console.log(message);
-        setIsTypeContentLoading(false);
-      });
-  };
+        const message: string | null = handleApiErrors(err)
+        if (message) console.error(message)
+        setIsTypeContentLoading(false)
+      })
+  }
 
   const getCountries = () => {
     apiGetCountries()
       .then((res: any) => {
-        setCountries(res.data);
-        const defaultCountryCode = "in";
-        setValue("country", defaultCountryCode);
-        getStates(defaultCountryCode);
+        setCountries(res.data)
       })
       .catch((err: any) => {
-        const message: string | null = handleApiErrors(err);
-        if (message) console.log(message);
-      });
-  };
+        const message: string | null = handleApiErrors(err)
+        if (message) console.error(message)
+      })
+  }
 
   const handleCountryChange = (value: string) => {
-    getStates(value);
-  };
+    getStates(value)
+  }
 
   const getStates = (country_id: any) => {
     apiGetStates(country_id)
       .then((res: any) => {
-        setStates(res.data);
-        setValue("state", "in-tn");
+        setStates(res.data)
       })
       .catch((err: any) => {
-        const message: string | null = handleApiErrors(err);
-        if (message) console.log(message);
-      });
-  };
+        const message: string | null = handleApiErrors(err)
+        if (message) console.error(message)
+      })
+  }
 
   const handleQtyChange = (newQty: number, index: number) => {
-    setTypeContentItems((prevItems: any) => prevItems.map((item: any, i: number) => (i === index ? { ...item, qty: newQty } : item)));
-    setValue(`qty-${index}`, newQty);
+    setTypeContentItems((prevItems: any) =>
+      prevItems.map((item: any, i: number) =>
+        i === index ? { ...item, qty: newQty } : item,
+      ),
+    )
+    setValue(`qty-${index}`, newQty)
     if (!changedItems.includes(index)) {
-      setChangedItems((prev) => [...prev, index]);
+      setChangedItems((prev) => [...prev, index])
     }
-  };
+  }
 
-  const handleNavaratriabhishegamQtyChange = (newQty: number, index: number, date: string, itemAmount: any) => {
-    setIsQtyChanged(true);
+  const handleNavaratriabhishegamQtyChange = (
+    newQty: number,
+    index: number,
+    date: string,
+    itemAmount: any,
+  ) => {
+    setIsQtyChanged(true)
     setTypeContentItems((prevItems: any) => {
       const updatedItems = prevItems.map((item: any, i: number) => {
         if (i === index) {
-          const amount = newQty * (itemAmount || typeContent?.amount);
-          return { ...item, qty: newQty, amount, date: date };
+          const amount = newQty * (itemAmount || typeContent?.amount)
+          return { ...item, qty: newQty, amount, date: date }
         }
-        return item;
-      });
+        return item
+      })
 
-      return updatedItems;
-    });
+      return updatedItems
+    })
 
-    setValue(`qty-${index}`, newQty);
-  };
+    setValue(`qty-${index}`, newQty)
+  }
 
   useEffect(() => {
-    if (typeContent?.item_has_name && typeContent?.has_items && typeContent?.item_has_count && !typeContent?.item_has_date) {
-      const defaultIndex = 0;
-      const defaultItem = typeContent.items[defaultIndex];
-      const defaultAmount = defaultItem.amount;
-      const defaultQty = 1;
+    if (
+      typeContent?.item_has_name &&
+      typeContent?.has_items &&
+      typeContent?.item_has_count &&
+      !typeContent?.item_has_date
+    ) {
+      const defaultIndex = 0
+      const defaultItem = typeContent.items[defaultIndex]
+      const defaultAmount = defaultItem.amount
+      const defaultQty = 1
 
-      const initializedItems = typeContent.items.map((item: any, index: number) => ({
-        ...item,
-        qty: index === defaultIndex ? defaultQty : 0,
-      }));
+      const initializedItems = typeContent.items.map(
+        (item: any, index: number) => ({
+          ...item,
+          qty: index === defaultIndex ? defaultQty : 0,
+        }),
+      )
 
-      setSelectedIndex(defaultIndex);
-      setSelectedAmount(defaultAmount);
-      setQty(defaultQty);
-      setTypeContentItems(initializedItems);
-      setValue("donatetype", defaultAmount);
-      setValue("qty", defaultQty);
+      setSelectedIndex(defaultIndex)
+      setSelectedAmount(defaultAmount)
+      setQty(defaultQty)
+      setTypeContentItems(initializedItems)
+      setValue('donatetype', defaultAmount)
+      setValue('qty', defaultQty)
     }
-  }, [typeContent]);
+  }, [typeContent])
 
   const handleDonationChange = (value: string) => {
-    const selectedAmount = Number(value);
-    const initialQty = 1;
-    const total = selectedAmount * initialQty;
+    const selectedAmount = Number(value)
+    const initialQty = 1
+    const total = selectedAmount * initialQty
 
-    const newIndex = typeContentItems.findIndex((item: any) => item.amount === selectedAmount);
+    const newIndex = typeContentItems.findIndex(
+      (item: any) => item.amount === selectedAmount,
+    )
 
     const updatedItems = typeContentItems.map((item: any, index: any) => {
       if (index === newIndex) {
-        return { ...item, qty: initialQty, amount: total };
+        return { ...item, qty: initialQty, amount: total }
       }
       if (index === selectedIndex) {
-        return { ...item, qty: 0 };
+        return { ...item, qty: 0 }
       }
-      return item;
-    });
+      return item
+    })
 
-    setTypeContentItems(updatedItems);
-    setSelectedAmount(selectedAmount);
-    setQty(initialQty);
-    setSelectedIndex(newIndex);
-    setValue("donatetype", selectedAmount);
-    setValue("qty", initialQty);
-  };
+    setTypeContentItems(updatedItems)
+    setSelectedAmount(selectedAmount)
+    setQty(initialQty)
+    setSelectedIndex(newIndex)
+    setValue('donatetype', selectedAmount)
+    setValue('qty', initialQty)
+  }
 
   const handleSingleQtyChange = (value: string) => {
-    const newQty = Number(value);
-    setQty(newQty);
-    setValue("qty", newQty);
+    const newQty = Number(value)
+    setQty(newQty)
+    setValue('qty', newQty)
 
     const updatedItems = typeContentItems.map((item: any, index: any) =>
       index === selectedIndex
@@ -306,71 +401,91 @@ export default function DonateType() {
             amount: newQty * selectedAmount,
           }
         : item,
-    );
+    )
 
-    setTypeContentItems(updatedItems);
-  };
+    setTypeContentItems(updatedItems)
+  }
 
   const handleClear = () => {
-    setTypeContentItems((prevItems: any) => prevItems.map((item: any, index: number) => ({ ...item, qty: index === 0 ? 1 : 0 })));
-  };
+    setTypeContentItems((prevItems: any) =>
+      prevItems.map((item: any, index: number) => ({
+        ...item,
+        qty: index === 0 ? 1 : 0,
+      })),
+    )
+  }
 
   const handleReset = () => {
-    setIsQtyChanged(false);
-    setTypeContentItems((prevItems: any) => prevItems.map((item: any, index: number) => ({ ...item, qty: 0, amount: 0 })));
+    setIsQtyChanged(false)
+    setTypeContentItems((prevItems: any) =>
+      prevItems.map((item: any, index: number) => ({
+        ...item,
+        qty: 0,
+        amount: 0,
+      })),
+    )
 
     typeContentItems.forEach((_: any, index: any) => {
-      setValue(`qty-${index}`, 0);
-    });
-  };
+      setValue(`qty-${index}`, 0)
+    })
+  }
 
-  const handleonSubmit = (data: any) => {
-    setIsLoading(true);
+  const formatDateToYMD = (date: any): string => {
+    if (!date) return ''
 
-    let finalAmount = data?.amount;
-    let finalItems: any = [];
+    const d = date instanceof Date ? date : new Date(date)
 
-    finalItems = [{ name: data?.donatetype, count: 1 }];
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
 
-    if (typeContent?.item_has_name && typeContent?.item_has_count && typeContent?.item_has_amount) {
-      finalAmount = typeContentItems.reduce((accumulator: any, item: any) => accumulator + item.amount * item.qty, 0);
+    return `${year}/${month}/${day}`
+  }
+
+  const handleonSubmit = async (data: any) => {
+    setIsLoading(true)
+
+    let finalAmount = data?.amount || 0
+    let finalItems: any = []
+
+    // Handle different donation types
+    if (
+      typeContent?.item_has_name &&
+      typeContent?.item_has_count &&
+      typeContent?.item_has_amount
+    ) {
+      finalAmount = typeContentItems.reduce(
+        (accumulator: any, item: any) => accumulator + item.amount * item.qty,
+        0,
+      )
 
       finalItems = typeContentItems
         .filter((item: any) => item.qty !== 0)
         .map((item: any) => ({
           name: item.name,
-          count: item.qty,
-        }));
-    }
-    
-    const formatDateToYMD = (date: any): string => {
-      const year = date?.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      return `${year}/${month}/${day}`;
-    };
-
-    if (typeContent?.has_dates && typeContent?.date_list) {
-      const dates = Array.isArray(data.date) ? data.date : [data.date];
+          count: Number(item.qty) || 0,
+        }))
+    } else if (typeContent?.has_dates && typeContent?.date_list) {
+      const dates = Array.isArray(data.date) ? data.date : [data.date]
 
       finalItems = dates.map((d: string) => ({
-        name: data?.donatetype,
+        name: data?.donatetype || typeContent?.code,
         count: 1,
         date: formatDateToYMD(d),
-      }));
-    }
-
-    if (typeContent?.has_dates && data?.date && typeContent?.date_list == null) {
-      const dates = Array.isArray(data.date) ? data.date : [data.date];
+      }))
+    } else if (
+      typeContent?.has_dates &&
+      data?.date &&
+      typeContent?.date_list == null
+    ) {
+      const dates = Array.isArray(data.date) ? data.date : [data.date]
 
       finalItems = dates.map((d: string) => ({
-        name: data?.donatetype,
+        name: data?.donatetype || typeContent?.code,
         count: 1,
         date: formatDateToYMD(d),
-      }));
-    }
-
-    if (typeContent?.item_has_date && data?.date) {
+      }))
+    } else if (typeContent?.item_has_date && data?.date) {
       finalItems = typeContentItems
         .filter((item: any) => item.qty !== 0)
         .map((item: any) => ({
@@ -378,46 +493,62 @@ export default function DonateType() {
           count: item.qty,
           amount: item?.amount,
           date: formatDateToYMD(data?.date),
-        }));
-    }
-    
-    if (typeContent?.has_items && typeContent?.item_has_count) {
-      finalAmount = data?.donatetype;
+        }))
+    } else if (typeContent?.has_items && typeContent?.item_has_count) {
+      finalAmount = data?.donatetype
       finalItems = typeContentItems
         .filter((item: any) => item.qty !== 0)
         .map((item: any) => ({
           name: item.name,
           count: item.qty,
           amount: data?.donatetype,
-        }));
-    }
-
-    if (eDonationVerify) {
-      finalItems = [{ name: data?.donatetype, amount: data?.amount, email: data?.email }];
-    }
-
-    if (typeContent?.has_members) {
-      finalAmount = latcharchanaiAmount;
+        }))
+    } else if (eDonationVerify) {
+      finalItems = [
+        { name: data?.donatetype, amount: data?.amount, email: data?.email },
+      ]
+    } else if (typeContent?.has_members) {
+      finalAmount = latcharchanaiAmount
       finalItems = [
         {
           name: data.name,
           nakshatra: data.nakshatra,
         },
         ...data.members,
-      ];
-    }
-
-    if (typeContent?.item_has_name && typeContent?.has_items && typeContent?.item_has_count && typeContent?.item_has_date) {
-      finalAmount = totalAmount;
+      ]
+    } else if (
+      typeContent?.item_has_name &&
+      typeContent?.has_items &&
+      typeContent?.item_has_count &&
+      typeContent?.item_has_date
+    ) {
+      finalAmount = totalAmount
       finalItems = typeContentItems
         .filter((item: any) => item.qty !== 0)
         .map((item: any) => ({
           name: item.name,
           count: item.qty,
           amount: item?.amount,
-          date: item?.date?.replace(/-/g, "/"),
-        }));
+          date: item?.date?.replace(/-/g, '/'),
+        }))
+    } else {
+      // Default case for simple donations
+      finalItems = [
+        {
+          name: data?.donatetype || typeContent?.code,
+          count: Number(data?.qty) || 1,
+        },
+      ]
     }
+
+    // Ensure all items have required fields
+    finalItems = finalItems.map((item: any) => ({
+      name: item.name || typeContent?.code,
+      count: item.count || 1,
+      amount: item.amount || finalAmount,
+      date: item.date || formatDateToYMD(new Date()),
+      ...item,
+    }))
 
     const postData = {
       uuid: generateUUID(),
@@ -431,627 +562,1313 @@ export default function DonateType() {
       address1: data?.addressline1,
       address2: data?.addressline2,
       postal_code: data?.postalcode,
-      payment_method: "razorpay",
+      payment_method: 'razorpay',
       items: finalItems,
-      trust_id: selectedTrust?.id,
+      trust_id: trustId,
       pan: panDetails?.data?.pan_number,
       aadhaar: aadhaarDetails?.data?.pan_number,
       city: data?.city,
       details: data?.details,
-      include_abhishegam: includeDailyAbhisegam,
-      add_postal: includeCourier,
-    };
+    }
 
-    localStorage.setItem("uuid", postData?.uuid);
+    console.log('Posting donation payload:', postData)
 
-    const userAuthStatus = JSON.parse(localStorage.getItem("acmec.user_auth_status") || "false");
+    AsyncStorage.setItem('uuid', postData?.uuid)
 
-    if (isShowPassword) {
-      if (!userAuthStatus) {
-        apiUserRegister({ name: data?.name, email: data?.email, password: data?.password, phone: data?.phone }).then((res: any) => {
-          const token = res.data?.token;
-          if (token) {
-            localStorage.setItem("acmec.api_token", res.data?.token);
-            apiUserProfile()
-              .then((res: any) => {
-                setIsLoading(false);
-                reset();
-                localStorage.setItem("acmec.user_auth_status", "true");
-                localStorage.setItem("acmec.user_name", res.data?.name);
-                localStorage.setItem("acmec.user_email", res.data?.email);
-                triggerAuth();
-              })
-              .catch((err: any) => {
-                setIsLoading(false);
-                const message: string | null = handleApiErrors(err);
-                if (message) console.log(message);
-              });
-          }
-          apiCreateDonations(postData)
-            .then((res: any) => {
-              setIsLoading(false);
-              setDonationInfo(res.data);
-              setScreenType("checkout");
-            })
-            .catch((err: any) => {
-              const message: string | null = handleApiErrors(err);
-              if (message) console.log(message);
-              setIsLoading(false);
-            });
-        });
-      } else {
-        apiCreateDonations(postData)
-          .then((res: any) => {
-            setIsLoading(false);
-            setDonationInfo(res.data);
-            setScreenType("checkout");
-          })
-          .catch((err: any) => {
-            const message: string | null = handleApiErrors(err);
-            if (message) console.log(message);
-            setIsLoading(false);
-          });
+    if (isShowPassword && userAuthStatus) {
+      try {
+        const registerResponse = await apiUserRegister({
+          name: data?.name,
+          email: data?.email,
+          password: data?.password,
+          phone: data?.phone,
+        })
+
+        const token = registerResponse.data?.token
+        if (token) {
+          AsyncStorage.setItem('acmec.api_token', token)
+          const profileResponse = await apiUserProfile()
+          setIsLoading(false)
+          reset()
+          AsyncStorage.setItem('acmec.user_auth_status', 'true')
+          AsyncStorage.setItem('acmec.user_name', profileResponse.data?.name)
+          AsyncStorage.setItem('acmec.user_email', profileResponse.data?.email)
+          setUserAuthStatus(true)
+          setIsAuthStatus(false)
+          triggerAuth()
+        }
+
+        const donationResponse = await apiCreateDonations(postData)
+        setIsLoading(false)
+        setDonationInfo(donationResponse.data)
+        setScreenType('checkout')
+      } catch (err: any) {
+        setIsLoading(false)
+        const message: string | null = handleApiErrors(err)
+        if (message) Alert.alert('Error', message)
       }
     } else {
-      apiCreateDonations(postData)
-        .then((res: any) => {
-          setIsLoading(false);
-          setDonationInfo(res.data);
-          setScreenType("checkout");
-        })
-        .catch((err: any) => {
-          const message: string | null = handleApiErrors(err);
-          if (message) console.log(message);
-          setIsLoading(false);
-        });
+      try {
+        const donationResponse = await apiCreateDonations(postData)
+        setIsLoading(false)
+        setDonationInfo(donationResponse.data)
+        setScreenType('checkout')
+      } catch (err: any) {
+        setIsLoading(false)
+        const message: string | null = handleApiErrors(err)
+        if (message) Alert.alert('Error', message)
+      }
     }
-  };
+  }
 
   const payRazorpay = () => {
-    setIsCheckoutLoading(true);
-    const postData = { donation_id: donationInfo?.id };
+    setIsCheckoutLoading(true)
+    const postData = { donation_id: donationInfo?.id }
     apiRazorpayCreate(postData)
       .then((res: any) => {
-        Alert.alert(
-          "Payment",
-          "Redirecting to payment gateway...",
-          [
-            {
-              text: "OK",
-              onPress: () => {
-                const callbackRequest = {
-                  donation_id: donationInfo?.id,
-                  razorpay_order_id: "mock_order_id",
-                  razorpay_payment_id: "mock_payment_id",
-                  razorpay_signature: "mock_signature",
-                };
-
-                apiRazorpayCallback(callbackRequest)
-                  .then((res: any) => {
-                    setScreenType("receipt");
-                  })
-                  .catch((err: any) => {
-                    const message: string | null = handleApiErrors(err);
-                    if (message) console.log(message);
-                    setIsCheckoutLoading(false);
-                  });
-              },
-            },
-          ]
-        );
+        // Razorpay integration would go here
+        Alert.alert('Payment', 'Razorpay integration would be implemented here')
+        setIsCheckoutLoading(false)
       })
       .catch((err: any) => {
-        const message: string | null = handleApiErrors(err);
-        if (message) console.log(message);
-        setIsCheckoutLoading(false);
-      });
-  };
+        const message: string | null = handleApiErrors(err)
+        if (message) console.error(message)
+        setIsCheckoutLoading(false)
+      })
+  }
 
   const getDonationReceipt = async () => {
-    setIsReceiptLoading(true);
+    setIsReceiptLoading(true)
     const postData = {
       donation_id: donationInfo?.id,
-      uuid: localStorage.getItem("uuid"),
-    };
+      uuid: await AsyncStorage.getItem('uuid'),
+    }
 
     try {
-      const response = await apiGetReceipt(postData);
-      Alert.alert("Receipt", "Receipt downloaded successfully");
+      const response = await apiGetReceipt(postData)
+      Alert.alert('Receipt', 'Receipt downloaded successfully')
     } catch (error) {
-      const message: string | null = handleApiErrors(error);
-      if (message) console.log(message);
+      const message: string | null = handleApiErrors(error)
+      if (message) console.error(message)
+    } finally {
+      setIsReceiptLoading(false)
     }
-  };
+  }
 
-  const handleCreateAccount = (isChecked: boolean) => {
-    setIsShowPassword(isChecked);
-  };
+  const handleCreateAccount = (value: boolean) => {
+    setIsShowPassword(value)
+  }
 
   const addDate = () => {
-    setSelectedDates([...selectedDates, new Date()]);
-  };
+    setSelectedDates([...selectedDates, new Date()])
+  }
 
   const removeDate = (index: number) => {
     setSelectedDates((prevDates: any[]) => {
-      const newDates = prevDates.filter((_, i) => i !== index);
-      return newDates;
-    });
+      const newDates = prevDates.filter((_, i) => i !== index)
+      return newDates
+    })
 
-    unregister(`date.${index}`);
-  };
+    unregister(`date.${index}`)
+  }
 
-  const handleDateChange = (index: number, event: any, value: Date | undefined) => {
-    if (event.type === 'set' && value) {
-      const newDateStr = value.toDateString();
-
-      const isDuplicate = selectedDates.some((date: Date | null, i: number) => {
-        if (i === index || !date) return false;
-        return date.toDateString() === newDateStr;
-      });
-
-      if (isDuplicate) {
-        console.log("This date is already selected.");
-        return;
-      }
-      
-      const newDates = [...selectedDates];
-      newDates[index] = value;
-      setSelectedDates(newDates);
-      setValue(`date.${index}`, value);
-      setDateError(false);
-      setShowDatePicker(null);
-    } else {
-      setShowDatePicker(null);
+  const handleDateChange = (index: number, event: any, selectedDate?: Date) => {
+    if (event.type === 'dismissed') {
+      setShowDatePicker(null)
+      return
     }
-  };
 
-  const allowedDates = typeContent?.date_list?.map((d: string) => new Date(d)) || [];
+    if (selectedDate) {
+      setSelectedDates((prevDates: any) => {
+        const updated = [...prevDates]
+        updated[index] = selectedDate
+        return updated
+      })
 
-  const modifiedQtyCount = typeContentItems.filter((item: any) => item.qty > 0).length;
+      // Update the form value
+      setValue(`date.${index}`, selectedDate)
+    }
 
-  const totalAmount = typeContentItems.reduce((acc: any, item: any) => acc + item.qty * (typeContent?.amount || 0), 0) + (includeCourier ? typeContent?.postal_fee : 0) + (includeDailyAbhisegam && isQtyChanged ? dailyAbhisegamAmount * modifiedQtyCount : 0);
+    setShowDatePicker(null)
+  }
+
+  const allowedDates =
+    typeContent?.date_list?.map((d: string) => new Date(d)) || []
+
+  const modifiedQtyCount = typeContentItems.filter(
+    (item: any) => item.qty > 0,
+  ).length
+
+  const totalAmount =
+    typeContentItems.reduce(
+      (acc: any, item: any) => acc + item.qty * (typeContent?.amount || 0),
+      0,
+    ) +
+    (includeCourier ? typeContent?.postal_fee : 0) +
+    (includeDailyAbhisegam && isQtyChanged
+      ? dailyAbhisegamAmount * modifiedQtyCount
+      : 0)
 
   if (isTypeContentLoading) {
     return (
-      <View className="flex-1 justify-center items-center p-4">
-        <ActivityIndicator size="large" color="#e53e3e" />
-        <Text className="mt-4 text-gray-600">Loading donation information...</Text>
-      </View>
-    );
+      <SafeAreaView className="flex-1 bg-white">
+        <StatusBar style="dark" />
+        <View className="p-4">
+          {Array.from({ length: 10 }, (_, index) => (
+            <View
+              key={index}
+              className="mb-2 h-4 rounded-lg bg-gray-100"
+            ></View>
+          ))}
+        </View>
+      </SafeAreaView>
+    )
   }
 
   if (!typeContent) {
     return (
-      <View className="flex-1 justify-center items-center p-4">
-        <Text className="text-2xl text-red-600 font-bold mb-4">404 Page not found</Text>
-        <Text className="text-base text-gray-600 mb-8 text-center">
-          Looks like something's broken. It's not you it's us.
-          How about going back to the home page?
-        </Text>
-        <TouchableOpacity 
-          className="bg-gray-200 px-4 py-2 rounded-lg"
-          onPress={() => router.push("/")}
-        >
-          <Text className="text-gray-700 uppercase font-semibold">Back to Home</Text>
-        </TouchableOpacity>
-      </View>
-    );
+      <SafeAreaView className="flex-1 bg-white">
+        <StatusBar style="dark" />
+        <View className="flex-1 items-center justify-center p-4">
+          <Text className="mb-4 text-2xl font-bold text-acmec-red">
+            404 Page not found
+          </Text>
+          <Text className="mb-8 text-center text-base text-gray-600">
+            Looks like something's broken. It's not you it's us. How about going
+            back to the home page?
+          </Text>
+          <TouchableOpacity
+            className="rounded-lg bg-gray-200 px-4 py-2"
+            onPress={() => router.push('/')}
+          >
+            <Text className="text-sm font-semibold uppercase text-gray-700">
+              Back to Home
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    )
   }
 
-  if (screenType === "checkout") {
+  if (screenType === 'checkout') {
     return (
-      <DonateCheckout 
-        donationInfo={donationInfo} 
-        setIsCheckoutLoading={setIsCheckoutLoading} 
-        isCheckoutLoading={isCheckoutLoading} 
-        payRazorpay={payRazorpay} 
-      />
-    );
+      <>
+        <Breadcrumb breadcrumb={breadcrumb} />
+        <DonateCheckout
+          donationInfo={donationInfo}
+          setIsCheckoutLoading={setIsCheckoutLoading}
+          isCheckoutLoading={isCheckoutLoading}
+          payRazorpay={payRazorpay}
+        />
+      </>
+    )
   }
 
-  if (screenType === "receipt") {
+  if (screenType === 'receipt') {
     return (
-      <DonateReceipt 
-        setIsReceiptLoading={setIsReceiptLoading}
-        isReceiptLoading={isReceiptLoading} 
-        getDonationReceipt={getDonationReceipt} 
-      />
-    );
+      <>
+        <Breadcrumb breadcrumb={breadcrumb} />
+        <DonateReceipt
+          isReceiptLoading={isReceiptLoading}
+          getDonationReceipt={getDonationReceipt}
+          setIsReceiptLoading={setIsReceiptLoading}
+        />
+      </>
+    )
   }
 
   return (
-    <ScrollView className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-white">
       <Breadcrumb breadcrumb={breadcrumb} />
-      
-      <View className="p-4">
-        <View className="items-center mb-6">
-          <Text className="text-2xl md:text-4xl font-bold text-red-600 mb-2">Donate Now</Text>
-          <View className="w-32 h-1 bg-red-600 mb-6" />
+      <StatusBar style="dark" />
+      <ScrollView
+        className="flex-1 p-4"
+        contentContainerStyle={{ paddingBottom: 40 }}
+      >
+        <View className="mb-6 items-center">
+          <Text className="mb-2 text-xl font-bold text-acmec-red md:text-2xl">
+            Donate Now
+          </Text>
+          <View className="mb-4 h-1 w-32 bg-acmec-red"></View>
         </View>
 
-        <View className="space-y-6">
-          {isAuthStatus && (
-            <View className="flex-row items-center my-3">
-              <TouchableOpacity 
-                onPress={() => handleCreateAccount(!isShowPassword)}
-                className="w-4 h-4 border border-gray-300 rounded mr-2 justify-center items-center"
-                style={{ backgroundColor: isShowPassword ? '#e53e3e' : 'transparent' }}
-              >
-                {isShowPassword && <Text className="text-white text-xs">✓</Text>}
-              </TouchableOpacity>
-              <Text className="text-base text-gray-800 font-medium">
-                Create new user account? If already have an account, login from profile
-              </Text>
-            </View>
-          )}
+        <View className="space-y-4">
+          <View className="my-3 flex-row items-center">
+            <Switch
+              value={isShowPassword}
+              onValueChange={handleCreateAccount}
+              trackColor={{ false: '#767577', true: '#81b0ff' }}
+            />
+            <Text className="ml-2 text-base font-medium text-gray-800">
+              Create new user account? {''}
+              If already have an account, Click{' '}
+              <Link href={'/login'} className="text-acmec-red">
+                here
+              </Link>{' '}
+              to login
+            </Text>
+          </View>
 
           {/* Dynamic Inputs */}
-          <View className="border-2 border-yellow-400 bg-yellow-100 rounded-lg p-4 mt-5">
-            {/* Fixed amount */}
-            {typeContent?.amount != null && typeContent?.minimum_amount == null && !typeContent?.has_members && !typeContent?.has_items && (
+          <View className="mt-5 rounded-lg border border-acmec-yellow bg-white p-4 shadow-md">
+            {/* Fixed amount - non-editable */}
+            {fixedAmount !== null && (
               <>
                 <View className="mb-4">
-                  <Text className="text-base text-red-600 mb-1">
+                  <Text className="mb-1 text-base text-acmec-red">
                     Amount <Text className="text-red-600">*</Text>
                   </Text>
-                  <TextInput
-                    value={typeContent?.amount.toString()}
-                    {...register("amount", {
-                      required: "Amount is required",
-                    })}
-                    onChangeText={(text) => {
-                      setValue("amount", text);
-                      trigger("amount");
+                  <View className="rounded-lg border border-gray-300 bg-gray-100 p-2">
+                    <Text className="text-gray-700">INR {fixedAmount}</Text>
+                  </View>
+                  <Controller
+                    control={control}
+                    name="amount"
+                    rules={{
+                      required: 'Amount is required',
                     }}
-                    className="w-full rounded-lg border-0 px-3 py-2 bg-white  border-gray-300"
-                    keyboardType="numeric"
+                    render={({ field: { value } }) => (
+                      <TextInput
+                        value={value?.toString() || fixedAmount.toString()}
+                        className="hidden"
+                        editable={false}
+                      />
+                    )}
                   />
-                  {errors.amount && <Text className="text-red-600 text-xs">{(errors.amount as any).message}</Text>}
                 </View>
               </>
             )}
 
             {/* Minimum amount value */}
-            {typeContent?.amount == null && typeContent?.minimum_amount != null && (
-              <View className="mb-4">
-                <Text className="text-base text-red-600 mb-1">
-                  Amount <Text className="text-red-600">*</Text>
-                </Text>
-                <TextInput
-                  defaultValue={typeContent?.amount?.toString()}
-                  {...register("amount", {
-                    required: "Amount is required",
-                  })}
-                  onChangeText={(text) => {
-                    setValue("amount", text);
-                    trigger("amount");
-                  }}
-                  className="w-full rounded-lg border-0 px-3 py-2 bg-white border-gray-300"
-                  keyboardType="numeric"
-                />
-                {errors.amount && <Text className="text-red-600 text-xs">{(errors.amount as any).message}</Text>}
-              </View>
-            )}
+            {typeContent?.amount == null &&
+              typeContent?.minimum_amount != null && (
+                <View className="mb-4">
+                  <Text className="mb-1 text-base text-acmec-red">
+                    Amount <Text className="text-red-600">*</Text>
+                  </Text>
+                  <Controller
+                    control={control}
+                    name="amount"
+                    rules={{
+                      required: 'Amount is required',
+                      validate: (value) =>
+                        value >= typeContent?.minimum_amount ||
+                        `Amount must be at least ${typeContent?.minimum_amount}`,
+                    }}
+                    render={({ field: { onChange, value } }) => (
+                      <TextInput
+                        value={value?.toString()}
+                        onChangeText={onChange}
+                        className="rounded-lg border border-gray-300 p-2"
+                        keyboardType="numeric"
+                      />
+                    )}
+                  />
+                  {errors.amount && (
+                    <Text className="text-xs text-acmec-red">
+                      {(errors.amount as any).message}
+                    </Text>
+                  )}
+                </View>
+              )}
 
             {/* amount and minimum_amount don't have a value */}
-            {typeContent?.amount == null && typeContent?.minimum_amount == null && !typeContent?.has_items && (
-              <View className="mb-4">
-                <Text className="text-base text-red-600 mb-1">
-                  Amount <Text className="text-red-600">*</Text>
-                </Text>
-                <TextInput
-                  defaultValue={""}
-                  {...register("amount", {
-                    required: "Amount is required",
-                  })}
-                  onChangeText={(text) => {
-                    setValue("amount", text);
-                    trigger("amount");
-                  }}
-                  className="w-full rounded-lg border-0 px-3 py-2 bg-white  border-gray-300"
-                  keyboardType="numeric"
-                />
-                {errors.amount && <Text className="text-red-600 text-xs">{(errors.amount as any).message}</Text>}
-              </View>
-            )}
+            {typeContent?.amount == null &&
+              typeContent?.minimum_amount == null &&
+              !typeContent?.has_items &&
+              fixedAmount === null && (
+                <View className="mb-4">
+                  <Text className="mb-1 text-base text-acmec-red">
+                    Amount <Text className="text-red-600">*</Text>
+                  </Text>
+                  <Controller
+                    control={control}
+                    name="amount"
+                    rules={{
+                      required: 'Amount is required',
+                      validate: (value) =>
+                        value >= (typeContent?.minimum_amount || 0) ||
+                        `Amount must be at least ${typeContent?.minimum_amount || 0}`,
+                    }}
+                    render={({ field: { onChange, value } }) => (
+                      <TextInput
+                        value={value?.toString()}
+                        onChangeText={onChange}
+                        className="rounded-lg border border-gray-300 p-2"
+                        keyboardType="numeric"
+                      />
+                    )}
+                  />
+                  {errors.amount && (
+                    <Text className="text-xs text-acmec-red">
+                      {(errors.amount as any).message}
+                    </Text>
+                  )}
+                </View>
+              )}
 
             {/* Fixed Select */}
             {!typeContent?.has_items && !typeContent?.has_members && (
               <View className="mb-4">
-                <Text className="text-base text-red-600 mb-1">
+                <Text className="mb-1 text-base text-acmec-red">
                   Donation Type
                 </Text>
-                <View className="border border-gray-300 rounded-lg bg-white">
-                  <Picker
-                    selectedValue={typeContent?.code}
-                    onValueChange={() => {}}
-                    enabled={false}
-                  >
-                    <Picker.Item label={typeContent?.name} value={typeContent?.code} />
-                  </Picker>
-                </View>
-                <TextInput
-                  {...register("donatetype", {
-                    required: "Donation type is required",
-                  })}
-                  value={typeContent.code}
-                  style={{ display: 'none' }}
+                <Controller
+                  control={control}
+                  name="donatetype"
+                  render={({ field: { value } }) => (
+                    <CustomPicker
+                      items={[
+                        {
+                          label: typeContent?.name, 
+                          value: typeContent?.code, 
+                        },
+                      ]}
+                      selectedValue={value || typeContent?.code}
+                      onValueChange={() => {}}
+                      enabled={false}
+                    />
+                  )}
                 />
-                {errors.donatetype && <Text className="text-red-600 text-xs">{(errors.donatetype as any).message}</Text>}
               </View>
             )}
 
-            {/* Amavasai Velvi */}
-            {typeContent?.has_dates && typeContent?.date_list != null && typeContent?.date_list?.length > 0 && (
-              <>
-                <View className="mb-4">
-                  <Text className="text-base text-red-600 mb-1">
-                    Date <Text className="text-red-600">*</Text>
-                  </Text>
+            {/* Date selection */}
+            {(typeContent?.has_dates || typeContent?.item_has_date) && (
+              <View className="mb-4">
+                <Text className="mb-1 text-base text-acmec-red">
+                  Date <Text className="text-red-600">*</Text>
+                </Text>
+                {selectedDates.map((date: Date, index: number) => (
+                  <View key={index} className="mb-2 flex-row items-center">
+                    <TouchableOpacity
+                      className="flex-1 rounded-lg border border-gray-300 p-2"
+                      onPress={() => {
+                        // For fixed dates like Ammavasai, don't allow changing
+                        if (!typeContent?.date_list) {
+                          setShowDatePicker(index)
+                        }
+                      }}
+                    >
+                      <Text>
+                        {typeContent?.date_list
+                          ? new Date(
+                              typeContent.date_list[index] || date,
+                            ).toDateString()
+                          : date.toDateString()}
+                      </Text>
+                    </TouchableOpacity>
 
-                  {selectedDates.map((date: any, index: any) => (
-                    <View key={index} className="flex-row items-center mb-2">
-                      <TouchableOpacity 
-                        onPress={() => setShowDatePicker(index)}
-                        className="flex-1 border border-gray-300 rounded-lg p-2 bg-white"
+                    {selectedDates.length > 1 && index !== 0 && (
+                      <TouchableOpacity
+                        className="ml-2 p-2"
+                        onPress={() => removeDate(index)}
                       >
-                        <Text>{date ? date.toLocaleDateString() : "Select a Date"}</Text>
+                        <Text className="text-lg text-red-600">×</Text>
                       </TouchableOpacity>
-                      
-                      {showDatePicker === index && (
-                        <DateTimePicker
-                          value={date || new Date()}
-                          mode="date"
-                          display="default"
-                          onChange={(event, selectedDate) => handleDateChange(index, event, selectedDate)}
-                          minimumDate={new Date()}
+                    )}
+
+                    <Controller
+                      control={control}
+                      name={`date.${index}`}
+                      rules={{ required: 'Date is required' }}
+                      render={({ field: { value, onChange } }) => (
+                        <>
+                          {showDatePicker === index &&
+                            (typeContent?.date_list ? (
+                              // ✅ Show dropdown instead of free date picker
+                              Platform.OS === 'web' ? (
+                                <select
+                                  value={value || ''}
+                                  onChange={(e) => {
+                                    const newDate = new Date(e.target.value)
+                                    handleDateChange(
+                                      index,
+                                      { type: 'set' },
+                                      newDate,
+                                    )
+                                    onChange(newDate.toISOString())
+                                  }}
+                                  style={{
+                                    padding: 10,
+                                    borderRadius: 8,
+                                    border: '1px solid #ccc',
+                                  }}
+                                >
+                                  <option value="">Select a date</option>
+                                  {typeContent.date_list.map(
+                                    (d: string, i: number) => (
+                                      <option key={i} value={d}>
+                                        {new Date(d).toDateString()}
+                                      </option>
+                                    ),
+                                  )}
+                                </select>
+                              ) : (
+                                <View className="rounded-lg border p-2">
+                                  {typeContent.date_list.map(
+                                    (d: string, i: number) => (
+                                      <TouchableOpacity
+                                        key={i}
+                                        onPress={() => {
+                                          const newDate = new Date(d)
+                                          handleDateChange(
+                                            index,
+                                            { type: 'set' },
+                                            newDate,
+                                          )
+                                          onChange(newDate.toISOString())
+                                        }}
+                                        className="py-2"
+                                      >
+                                        <Text>
+                                          {new Date(d).toDateString()}
+                                        </Text>
+                                      </TouchableOpacity>
+                                    ),
+                                  )}
+                                </View>
+                              )
+                            ) : // ✅ Fallback: normal free date picker when no fixed list
+                            Platform.OS === 'web' ? (
+                              <input
+                                type="date"
+                                value={
+                                  value
+                                    ? new Date(value)
+                                        .toISOString()
+                                        .split('T')[0]
+                                    : new Date().toISOString().split('T')[0]
+                                }
+                                onChange={(e) => {
+                                  const newDate = new Date(e.target.value)
+                                  handleDateChange(
+                                    index,
+                                    { type: 'set' },
+                                    newDate,
+                                  )
+                                  onChange(newDate.toISOString())
+                                }}
+                                style={{
+                                  padding: 10,
+                                  borderRadius: 8,
+                                  border: '1px solid #ccc',
+                                }}
+                              />
+                            ) : (
+                              <DateTimePicker
+                                value={value ? new Date(value) : new Date()}
+                                mode="date"
+                                display="default"
+                                onChange={(event, selectedDate) =>
+                                  handleDateChange(index, event, selectedDate)
+                                }
+                                minimumDate={new Date()}
+                              />
+                            ))}
+                        </>
+                      )}
+                    />
+                  </View>
+                ))}
+                {errors.date && (
+                  <Text className="text-xs text-acmec-red">
+                    {(errors.date as any).message}
+                  </Text>
+                )}
+              </View>
+            )}
+
+            {/* Item selection with quantity */}
+            {typeContent?.has_items &&
+              typeContent?.items &&
+              typeContent?.item_has_count &&
+              !typeContent?.item_has_description && (
+                <>
+                  <View className="mb-4">
+                    <Text className="mb-1 text-base text-acmec-red">
+                      Velvi <Text className="text-red-600">*</Text>
+                    </Text>
+                    <Controller
+                      control={control}
+                      name="donatetype"
+                      rules={{ required: 'Donation is required' }}
+                      render={({ field: { onChange, value } }) => (
+                        <CustomPicker
+                          items={typeContent?.items?.map((data: any) => ({
+                            label: data.name,
+                            value: data.amount,
+                          }))}
+                          selectedValue={value}
+                          onValueChange={(itemValue: string) => {
+                            onChange(itemValue)
+                            handleDonationChange(itemValue)
+                          }}
                         />
                       )}
-                      
-                      {selectedDates.length > 1 && index !== 0 && (
-                        <TouchableOpacity 
-                          onPress={() => removeDate(index)}
-                          className="ml-2 p-2"
-                        >
-                          <Text className="text-red-600 text-lg">×</Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  ))}
+                    />
+                    {errors.donatetype && (
+                      <Text className="text-xs text-acmec-red">
+                        {(errors.donatetype as any).message}
+                      </Text>
+                    )}
+                  </View>
 
-                  {typeContent?.multiple_dates && (
-                    <TouchableOpacity 
-                      onPress={addDate}
-                      className="mt-2"
-                    >
-                      <Text className="text-sm text-red-600 font-semibold">Add Date</Text>
-                    </TouchableOpacity>
+                  <View className="mb-4">
+                    <Text className="mb-1 text-base text-acmec-red">
+                      Quantity
+                    </Text>
+                    <Controller
+                      control={control}
+                      name="qty"
+                      render={({ field: { onChange, value } }) => (
+                        <TextInput
+                          value={value?.toString() || qty.toString()}
+                          onChangeText={(text) => {
+                            onChange(text)
+                            handleSingleQtyChange(text)
+                          }}
+                          className="rounded-lg border border-gray-300 p-2"
+                          keyboardType="numeric"
+                        />
+                      )}
+                    />
+                  </View>
+
+                  {typeContent?.detail_label && (
+                    <View className="mb-4">
+                      <Text className="mb-1 text-base text-acmec-red">
+                        {typeContent?.detail_label}
+                      </Text>
+                      <Controller
+                        control={control}
+                        name="details"
+                        render={({ field: { onChange, value } }) => (
+                          <TextInput
+                            value={value}
+                            onChangeText={onChange}
+                            className="rounded-lg border border-gray-300 p-2"
+                          />
+                        )}
+                      />
+                    </View>
                   )}
+
+                  <View className="my-2 items-center">
+                    <Text className="text-xl font-bold text-acmec-red">
+                      Total Amount: INR{' '}
+                      {selectedAmount > 0
+                        ? qty * selectedAmount +
+                          (includeCourier ? typeContent?.postal_fee : 0)
+                        : typeContent?.items[0]?.amount +
+                          (includeCourier ? typeContent?.postal_fee : 0)}
+                    </Text>
+                  </View>
+                </>
+              )}
+
+            {/* General item selection */}
+            {typeContent?.has_items &&
+              typeContent?.items &&
+              !typeContent?.item_has_count &&
+              !typeContent?.item_has_description && (
+                <>
+                  <View className="mb-4">
+                    <Text className="mb-1 text-base text-acmec-red">
+                      Donation Type
+                    </Text>
+                    <Controller
+                      control={control}
+                      name="donatetype"
+                      rules={{ required: 'Donation is required' }}
+                      render={({ field: { onChange, value } }) => (
+                        <CustomPicker
+                          items={typeContent?.items?.map((data: any) => ({
+                            label: data.name,
+                            value: data.name,
+                          }))}
+                          selectedValue={value}
+                          onValueChange={onChange}
+                        />
+                      )}
+                    />
+                    {errors.donatetype && (
+                      <Text className="text-xs text-acmec-red">
+                        {(errors.donatetype as any).message}
+                      </Text>
+                    )}
+                  </View>
+
+                  {typeContent?.detail_label && (
+                    <View className="mb-4">
+                      <Text className="mb-1 text-base text-acmec-red">
+                        {typeContent?.detail_label}
+                      </Text>
+                      <Controller
+                        control={control}
+                        name="details"
+                        render={({ field: { onChange, value } }) => (
+                          <TextInput
+                            value={value}
+                            onChangeText={onChange}
+                            className="rounded-lg border border-gray-300 p-2"
+                          />
+                        )}
+                      />
+                    </View>
+                  )}
+                </>
+              )}
+
+            {/* Members form */}
+            {typeContent?.has_members && (
+              <>
+                <View className="mb-4">
+                  <Text className="mb-1 text-base text-acmec-red">
+                    Name <Text className="text-red-600">*</Text>
+                  </Text>
+                  <Controller
+                    control={control}
+                    name="name"
+                    rules={{ required: 'Name is required' }}
+                    render={({ field: { onChange, value } }) => (
+                      <TextInput
+                        value={value}
+                        onChangeText={onChange}
+                        placeholder="Please Enter the name"
+                        className="rounded-lg border border-gray-300 p-2"
+                      />
+                    )}
+                  />
                 </View>
-                <View className="items-center">
-                  <Text className="text-xl font-bold my-2 text-red-600">
-                    Total Amount: INR {typeContent?.amount * selectedDates.length}
+
+                <View className="mb-4">
+                  <Text className="mb-1 text-base text-acmec-red">
+                    Nakshatra <Text className="text-red-600">*</Text>
+                  </Text>
+                  <Controller
+                    control={control}
+                    name="nakshatra"
+                    rules={{ required: 'Nakshatra is required' }}
+                    render={({ field: { onChange, value } }) => (
+                      <TextInput
+                        value={value}
+                        onChangeText={onChange}
+                        placeholder="Please Enter the Nakshatra"
+                        className="rounded-lg border border-gray-300 p-2"
+                      />
+                    )}
+                  />
+                </View>
+
+                {fields.map((field, index) => (
+                  <View key={field.id} className="mb-4">
+                    <View className="flex-row items-center">
+                      <View className="flex-1">
+                        <Text className="mb-1 text-base text-acmec-red">
+                          Name <Text className="text-red-600">*</Text>
+                        </Text>
+                        <Controller
+                          control={control}
+                          name={`members.${index}.name`}
+                          rules={{ required: 'Name is required' }}
+                          render={({ field: { onChange, value } }) => (
+                            <TextInput
+                              value={value}
+                              onChangeText={onChange}
+                              placeholder="Please Enter the name"
+                              className="rounded-lg border border-gray-300 p-2"
+                            />
+                          )}
+                        />
+                      </View>
+
+                      <View className="ml-2 flex-1">
+                        <Text className="mb-1 text-base text-acmec-red">
+                          Nakshatra <Text className="text-red-600">*</Text>
+                        </Text>
+                        <Controller
+                          control={control}
+                          name={`members.${index}.nakshatra`}
+                          rules={{ required: 'Nakshatra is required' }}
+                          render={({ field: { onChange, value } }) => (
+                            <TextInput
+                              value={value}
+                              onChangeText={onChange}
+                              placeholder="Please Enter the Nakshatra"
+                              className="rounded-lg border border-gray-300 p-2"
+                            />
+                          )}
+                        />
+                      </View>
+
+                      <TouchableOpacity
+                        className="ml-2 p-2"
+                        onPress={() => {
+                          remove(index)
+                          setLatcharchanaiAmount((prev: any) =>
+                            Math.max(
+                              typeContent?.amount || 0,
+                              prev - typeContent?.amount,
+                            ),
+                          )
+                        }}
+                      >
+                        <Text className="text-lg text-red-600">×</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
+
+                <TouchableOpacity
+                  className="mb-4 rounded bg-acmec-red p-2"
+                  onPress={() => {
+                    if (canAddMore) {
+                      append({ name: '', nakshatra: '' })
+                      setLatcharchanaiAmount(
+                        (prev: any) => prev + (typeContent?.amount || 0),
+                      )
+                    }
+                  }}
+                  disabled={!canAddMore}
+                >
+                  <Text className="text-center text-white">Add a member</Text>
+                </TouchableOpacity>
+
+                <View className="my-2 items-center">
+                  <Text className="text-xl font-bold text-acmec-red">
+                    Amount: INR{' '}
+                    {latcharchanaiAmount +
+                      (includeCourier ? typeContent?.postal_fee : 0)}
                   </Text>
                 </View>
               </>
             )}
 
-            {/* Other donation type sections would follow similar patterns */}
+            {/* Item grid with quantity and date */}
+            {typeContent?.has_items &&
+              typeContent?.item_has_description &&
+              typeContent?.items &&
+              typeContent?.item_has_count &&
+              typeContent?.item_has_date && (
+                <>
+                  <View className="mb-4">
+                    <View className="flex-row items-center">
+                      <Switch
+                        value={includeDailyAbhisegam}
+                        onValueChange={(value) => {
+                          setIncludeDailyAbhisegam(value)
+                          if (value) {
+                            const params = { trust_id: trustId }
+                            apiDonationTypeBySlug('daily-abhishegam', params)
+                              .then((res: any) => {
+                                setDailyAbhisegamAmount(res.data?.amount || 0)
+                              })
+                              .catch((err: any) => {
+                                const message: string | null =
+                                  handleApiErrors(err)
+                                if (message) console.error(message)
+                              })
+                          } else {
+                            setDailyAbhisegamAmount(0)
+                          }
+                        }}
+                      />
+                      <Text className="ml-2 text-base text-acmec-red">
+                        Include Daily Abhisegam
+                      </Text>
+                    </View>
+                  </View>
 
+                  <View className="mb-4">
+                    <View className="flex-row flex-wrap justify-between">
+                      {typeContent?.items?.map((item: any, index: number) => (
+                        <View
+                          key={index}
+                          className="mb-2 w-full p-1 md:w-1/2 lg:w-1/3"
+                        >
+                          <View className="rounded-lg border-2 border-acmec-yellow p-2">
+                            <Text className="text-sm font-medium text-acmec-red">
+                              {item?.name}
+                            </Text>
+                            {item?.date && (
+                              <Text className="text-sm font-medium text-acmec-red">
+                                {new Date(item.date).toLocaleDateString(
+                                  'en-GB',
+                                )}
+                              </Text>
+                            )}
+                            <Text className="mb-2 text-xs text-acmec-red">
+                              {item?.description}
+                            </Text>
+
+                            <View className="flex-row items-center justify-between">
+                              {item?.amount && (
+                                <Text className="font-semibold text-acmec-red">
+                                  ₹ {item?.amount}
+                                </Text>
+                              )}
+                              <View className="flex-row items-center">
+                                <Text className="mr-1 text-acmec-red">
+                                  Qty:
+                                </Text>
+                                <Controller
+                                  control={control}
+                                  name={`qty-${index}`}
+                                  render={({ field: { value } }) => (
+                                    <TextInput
+                                      value={value?.toString() || '0'}
+                                      onChangeText={(text) =>
+                                        handleNavaratriabhishegamQtyChange(
+                                          Number(text),
+                                          index,
+                                          item?.date,
+                                          item?.amount,
+                                        )
+                                      }
+                                      className="w-12 rounded border border-gray-300 p-1 text-center"
+                                      keyboardType="numeric"
+                                    />
+                                  )}
+                                />
+                              </View>
+                            </View>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+
+                    <TouchableOpacity
+                      className="mt-2 self-end"
+                      onPress={handleReset}
+                    >
+                      <Text className="text-acmec-red underline">Reset</Text>
+                    </TouchableOpacity>
+
+                    <View className="my-2 items-center">
+                      <Text className="text-xl font-bold text-acmec-red">
+                        Total Amount: INR {totalAmount}
+                      </Text>
+                    </View>
+                  </View>
+                </>
+              )}
+
+            {/* Item grid with quantity only */}
+            {typeContent?.has_items &&
+              typeContent?.item_has_description &&
+              typeContent?.items &&
+              typeContent?.item_has_count &&
+              !typeContent?.item_has_date && (
+                <>
+                  <View className="mb-4">
+                    <View className="flex-row flex-wrap justify-between">
+                      {typeContentItems.map((item: any, index: number) => (
+                        <View
+                          key={index}
+                          className="mb-2 w-full p-1 md:w-1/2 lg:w-1/3"
+                        >
+                          <View className="rounded-lg border-2 border-acmec-yellow p-2">
+                            <Text className="text-sm font-medium text-acmec-red">
+                              {item?.name}
+                            </Text>
+                            <Text className="mb-2 text-xs text-acmec-red">
+                              {item?.description}
+                            </Text>
+
+                            <View className="flex-row items-center justify-between">
+                              <Text className="font-semibold text-acmec-red">
+                                ₹ {item?.amount}
+                              </Text>
+                              <View className="flex-row items-center">
+                                <Text className="mr-1 text-acmec-red">
+                                  Qty:
+                                </Text>
+                                <Controller
+                                  control={control}
+                                  name={`qty-${index}`}
+                                  render={({ field: { value } }) => (
+                                    <TextInput
+                                      value={value?.toString() || '0'}
+                                      onChangeText={(text) =>
+                                        handleQtyChange(Number(text), index)
+                                      }
+                                      className="w-12 rounded border border-gray-300 p-1 text-center"
+                                      keyboardType="numeric"
+                                    />
+                                  )}
+                                />
+                              </View>
+                            </View>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+
+                    <TouchableOpacity
+                      className="mt-2 self-end"
+                      onPress={handleClear}
+                    >
+                      <Text className="text-acmec-red underline">Reset</Text>
+                    </TouchableOpacity>
+
+                    <View className="my-2 items-center">
+                      <Text className="text-xl font-bold text-acmec-red">
+                        Total Amount: ₹{' '}
+                        {typeContentItems.reduce(
+                          (accumulator: any, item: any) =>
+                            accumulator + item.amount * item.qty,
+                          0,
+                        )}
+                      </Text>
+                    </View>
+                  </View>
+                </>
+              )}
+
+            {/* Courier option */}
             {typeContent?.has_postal && (
-              <View className="items-center mt-4">
-                <View className="flex-row items-center">
-                  <TouchableOpacity 
-                    onPress={() => setIncludeCourier(!includeCourier)}
-                    className="w-4 h-4 border border-gray-300 rounded mr-2 justify-center items-center"
-                    style={{ backgroundColor: includeCourier ? '#e53e3e' : 'transparent' }}
-                  >
-                    {includeCourier && <Text className="text-white text-xs">✓</Text>}
-                  </TouchableOpacity>
-                  <Text className="text-lg text-gray-700">Send Prasadham by Courier</Text>
-                </View>
+              <View className="mb-4 flex-row items-center">
+                <Switch
+                  value={includeCourier}
+                  onValueChange={setIncludeCourier}
+                />
+                <Text className="ml-2 text-base text-gray-700">
+                  Send Prasadham by Courier
+                </Text>
               </View>
             )}
           </View>
 
           {showPersonalAndBilling && (
             <>
-              {isShowPassword && showPersonalAndBilling && (
-                <View className="border-2 border-yellow-400 bg-yellow-100 rounded-lg p-4 my-6">
-                  <Text className="uppercase font-semibold text-red-600 pb-2 border-b border-gray-200">Account Detail</Text>
+              {/* Account Details */}
+              {isShowPassword && (
+                <View className="my-4 rounded-lg border border-acmec-yellow bg-white p-4">
+                  <Text className="mb-4 border-b border-b-gray-200 pb-2 font-semibold uppercase text-acmec-red">
+                    Account Detail
+                  </Text>
 
-                  <View className="mt-4">
-                    <View className="mb-4">
-                      <Text className="text-base text-red-600 mb-1">
-                        Password <Text className="text-red-600">*</Text>
+                  {/* Password */}
+                  <View className="mb-4">
+                    <Text className="mb-1 text-base text-acmec-red">
+                      Password <Text className="text-red-600">*</Text>
+                    </Text>
+                    <Controller
+                      control={control}
+                      name="password"
+                      rules={{ required: 'Password is required' }}
+                      render={({ field: { onChange, value } }) => (
+                        <TextInput
+                          value={value}
+                          onChangeText={onChange}
+                          secureTextEntry
+                          className="rounded-lg border border-gray-300 p-2"
+                        />
+                      )}
+                    />
+                    {errors.password && (
+                      <Text className="text-xs text-acmec-red">
+                        {(errors.password as any).message}
                       </Text>
-                      <TextInput
-                        {...register("password", { required: "Password is required" })}
-                        secureTextEntry
-                        className="w-full rounded-lg border-0 px-3 py-2 bg-white  border-gray-300"
-                      />
-                      {errors.password && <Text className="text-red-600 text-xs">{(errors.password as any).message}</Text>}
-                    </View>
+                    )}
+                  </View>
 
-                    <View className="mb-4">
-                      <Text className="text-base text-red-600 mb-1">
-                        Confirm Password <Text className="text-red-600">*</Text>
+                  {/* Confirm Password */}
+                  <View className="mb-4">
+                    <Text className="mb-1 text-base text-acmec-red">
+                      Confirm Password <Text className="text-red-600">*</Text>
+                    </Text>
+                    <Controller
+                      control={control}
+                      name="confirmpassword"
+                      rules={{
+                        required: 'Confirm Password is required',
+                        validate: (value) =>
+                          value === watch('password') ||
+                          'Passwords do not match',
+                      }}
+                      render={({ field: { onChange, value } }) => (
+                        <TextInput
+                          value={value}
+                          onChangeText={onChange}
+                          secureTextEntry
+                          className="rounded-lg border border-gray-300 p-2"
+                        />
+                      )}
+                    />
+                    {errors.confirmpassword && (
+                      <Text className="text-xs text-acmec-red">
+                        {(errors.confirmpassword as any).message}
                       </Text>
-                      <TextInput
-                        {...register("confirmpassword", { required: "Confirm Password is required" })}
-                        secureTextEntry
-                        className="w-full rounded-lg border-0 px-3 py-2 bg-white  border-gray-300"
-                      />
-                      {errors.confirmpassword && <Text className="text-red-600 text-xs">{(errors.confirmpassword as any).message}</Text>}
-                    </View>
+                    )}
                   </View>
                 </View>
               )}
 
-              {/* Personal Detail */}
-              <View className="border-2 border-yellow-400 bg-yellow-100 rounded-lg p-4 my-6">
-                <Text className="uppercase text-xl font-semibold text-red-600 pb-2">Personal Detail</Text>
+              {/* Personal Details */}
+              <View className="my-4 rounded-lg border border-acmec-yellow bg-white p-4">
+                <Text className="mb-4 pb-2 text-xl font-semibold uppercase text-acmec-red">
+                  Personal Detail
+                </Text>
 
-                <View className="pb-6 border-b border-red-600">
+                <View className="mb-4 border-b border-acmec-red pb-4">
                   <View className="mb-4">
-                    <Text className="text-base text-red-600 mb-1">
+                    <Text className="mb-1 text-base text-acmec-red">
                       Name <Text className="text-red-600">*</Text>
                     </Text>
-                    <TextInput
-                      {...register("name", { required: "Name is required" })}
-                      className="w-full rounded-lg border-0 px-3 py-2 bg-white  border-gray-300"
+                    <Controller
+                      control={control}
+                      name="name"
+                      rules={{ required: 'Name is required' }}
+                      render={({ field: { onChange, value } }) => (
+                        <TextInput
+                          value={value}
+                          onChangeText={onChange}
+                          className="rounded-lg border border-gray-300 p-2 text-acmec-red"
+                        />
+                      )}
                     />
-                    {errors.name && <Text className="text-red-600 text-xs">{(errors.name as any).message}</Text>}
-                    </View>
+                    {errors.name && (
+                      <Text className="text-xs text-acmec-red">
+                        {(errors.name as any).message}
+                      </Text>
+                    )}
+                  </View>
 
                   <View className="mb-4">
-                    <Text className="text-base text-red-600 mb-1">
+                    <Text className="mb-1 text-base text-acmec-red">
                       Email Address <Text className="text-red-600">*</Text>
                     </Text>
-                    <TextInput
-                      {...register("email", { 
-                        required: "Email is required", 
+                    <Controller
+                      control={control}
+                      name="email"
+                      rules={{
+                        required: 'Email is required',
                         pattern: {
-                          value: /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/,
-                          message: "Invalid email address"
-                        } 
-                      })}
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                      className="w-full rounded-lg border-0 px-3 py-2 bg-white  border-gray-300"
+                          value:
+                            /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/,
+                          message: 'Invalid email address',
+                        },
+                      }}
+                      render={({ field: { onChange, value } }) => (
+                        <TextInput
+                          value={value}
+                          onChangeText={onChange}
+                          keyboardType="email-address"
+                          autoCapitalize="none"
+                          className="rounded-lg border border-gray-300 p-2"
+                        />
+                      )}
                     />
-                    {errors.email && <Text className="text-red-600 text-xs">{(errors.email as any).message}</Text>}
+                    {errors.email && (
+                      <Text className="text-xs text-acmec-red">
+                        {(errors.email as any).message}
+                      </Text>
+                    )}
                   </View>
 
                   <View className="mb-4">
-                    <Text className="text-base text-red-600 mb-1">
+                    <Text className="mb-1 text-base text-acmec-red">
                       Phone Number <Text className="text-red-600">*</Text>
                     </Text>
-                    <TextInput
-                      {...register("phone", { required: "Phone is required" })}
-                      keyboardType="phone-pad"
-                      className="w-full rounded-lg border-0 px-3 py-2 bg-white  border-gray-300"
+                    <Controller
+                      control={control}
+                      name="phone"
+                      rules={{ required: 'Phone is required' }}
+                      render={({ field: { onChange, value } }) => (
+                        <TextInput
+                          value={value}
+                          onChangeText={onChange}
+                          keyboardType="phone-pad"
+                          className="rounded-lg border border-gray-300 p-2"
+                        />
+                      )}
                     />
-                    {errors.phone && <Text className="text-red-600 text-xs">{(errors.phone as any).message}</Text>}
+                    {errors.phone && (
+                      <Text className="text-xs text-acmec-red">
+                        {(errors.phone as any).message}
+                      </Text>
+                    )}
                   </View>
                 </View>
 
-                <Text className="uppercase font-semibold text-red-600 text-xl py-2">Billing Detail</Text>
-                
+                <Text className="mb-4 pb-2 text-xl font-semibold uppercase text-acmec-red">
+                  Billing Detail
+                </Text>
+
                 <View className="mb-4">
-                  <Text className="text-base text-red-600 mb-1">
+                  <Text className="mb-1 text-base text-acmec-red">
                     Address Line 1 <Text className="text-red-600">*</Text>
                   </Text>
-                  <TextInput
-                    {...register("addressline1", { required: "Address is required" })}
-                    className="w-full rounded-lg border-0 px-3 py-2 bg-white  border-gray-300"
+                  <Controller
+                    control={control}
+                    name="addressline1"
+                    rules={{ required: 'Address is required' }}
+                    render={({ field: { onChange, value } }) => (
+                      <TextInput
+                        value={value}
+                        onChangeText={onChange}
+                        className="rounded-lg border border-gray-300 p-2"
+                      />
+                    )}
                   />
-                  {errors.addressline1 && <Text className="text-red-600 text-xs">{(errors.addressline1 as any).message}</Text>}
+                  {errors.addressline1 && (
+                    <Text className="text-xs text-acmec-red">
+                      {(errors.addressline1 as any).message}
+                    </Text>
+                  )}
                 </View>
 
                 <View className="mb-4">
-                  <Text className="text-base text-red-600 mb-1">
+                  <Text className="mb-1 text-base text-acmec-red">
                     Address Line 2
                   </Text>
-                  <TextInput
-                    {...register("addressline2")}
-                    className="w-full rounded-lg border-0 px-3 py-2 bg-white  border-gray-300"
+                  <Controller
+                    control={control}
+                    name="addressline2"
+                    render={({ field: { onChange, value } }) => (
+                      <TextInput
+                        value={value}
+                        onChangeText={onChange}
+                        className="rounded-lg border border-gray-300 p-2"
+                      />
+                    )}
                   />
                 </View>
 
                 <View className="mb-4">
-                  <Text className="text-base text-red-600 mb-1">
+                  <Text className="mb-1 text-base text-acmec-red">
                     Country <Text className="text-red-600">*</Text>
                   </Text>
-                  <View className="border border-gray-300 rounded-lg bg-white">
-                    <Picker
-                      {...register("country", { required: "Country is required" })}
-                      onValueChange={handleCountryChange}
-                    >
-                      {Object.keys(countries).map((key: any) => (
-                        <Picker.Item key={key} label={countries[key]} value={key} />
-                      ))}
-                    </Picker>
-                  </View>
-                  {errors.country && <Text className="text-red-600 text-xs">{(errors.country as any).message}</Text>}
+                  <Controller
+                    control={control}
+                    name="country"
+                    rules={{ required: 'Country is required' }}
+                    render={({ field: { onChange, value } }) => (
+                      <CustomPicker
+                        items={Object.keys(countries).map((key: any) => ({
+                          label: countries[key],
+                          value: key,
+                        }))}
+                        selectedValue={value}
+                        onValueChange={(itemValue: string) => {
+                          onChange(itemValue)
+                          handleCountryChange(itemValue)
+                        }}
+                      />
+                    )}
+                  />
+                  {errors.country && (
+                    <Text className="text-xs text-acmec-red">
+                      {(errors.country as any).message}
+                    </Text>
+                  )}
                 </View>
 
                 <View className="mb-4">
-                  <Text className="text-base text-red-600 mb-1">
+                  <Text className="mb-1 text-base text-acmec-red">
                     State <Text className="text-red-600">*</Text>
                   </Text>
-                  <View className="border border-gray-300 rounded-lg bg-white">
-                    <Picker
-                      {...register("state", { required: "State is required" })}
-                    >
-                      {Object.keys(states).map((key: any) => (
-                        <Picker.Item key={key} label={states[key]} value={key} />
-                      ))}
-                    </Picker>
-                  </View>
-                  {errors.state && <Text className="text-red-600 text-xs">{(errors.state as any).message}</Text>}
+                  <Controller
+                    control={control}
+                    name="state"
+                    rules={{ required: 'State is required' }}
+                    render={({ field: { onChange, value } }) => (
+                      <CustomPicker
+                        items={Object.keys(states).map((key: any) => ({
+                          label: states[key],
+                          value: key,
+                        }))}
+                        selectedValue={value}
+                        onValueChange={onChange}
+                      />
+                    )}
+                  />
+                  {errors.state && (
+                    <Text className="text-xs text-acmec-red">
+                      {(errors.state as any).message}
+                    </Text>
+                  )}
                 </View>
 
                 <View className="mb-4">
-                  <Text className="text-base text-red-600 mb-1">
+                  <Text className="mb-1 text-base text-acmec-red">
                     City <Text className="text-red-600">*</Text>
                   </Text>
-                  <TextInput
-                    {...register("city", { required: "City is required" })}
-                    className="w-full rounded-lg border-0 px-3 py-2 bg-white  border-gray-300"
+                  <Controller
+                    control={control}
+                    name="city"
+                    rules={{ required: 'City is required' }}
+                    render={({ field: { onChange, value } }) => (
+                      <TextInput
+                        value={value}
+                        onChangeText={onChange}
+                        className="rounded-lg border border-gray-300 p-2"
+                      />
+                    )}
                   />
-                  {errors.city && <Text className="text-red-600 text-xs">{(errors.city as any).message}</Text>}
+                  {errors.city && (
+                    <Text className="text-xs text-acmec-red">
+                      {(errors.city as any).message}
+                    </Text>
+                  )}
                 </View>
 
                 <View className="mb-4">
-                  <Text className="text-base text-red-600 mb-1">
+                  <Text className="mb-1 text-base text-acmec-red">
                     Zip / Postal Code <Text className="text-red-600">*</Text>
                   </Text>
-                  <TextInput
-                    {...register("postalcode", { required: "Postal Code is required" })}
-                    keyboardType="numeric"
-                    className="w-full rounded-lg border-0 px-3 py-2 bg-white  border-gray-300"
+                  <Controller
+                    control={control}
+                    name="postalcode"
+                    rules={{ required: 'Postal Code is required' }}
+                    render={({ field: { onChange, value } }) => (
+                      <TextInput
+                        value={value}
+                        onChangeText={onChange}
+                        className="rounded-lg border border-gray-300 p-2"
+                        keyboardType="numeric"
+                      />
+                    )}
                   />
-                  {errors.postalcode && <Text className="text-red-600 text-xs">{(errors.postalcode as any).message}</Text>}
+                  {errors.postalcode && (
+                    <Text className="text-xs text-acmec-red">
+                      {(errors.postalcode as any).message}
+                    </Text>
+                  )}
                 </View>
               </View>
 
               <TouchableOpacity
+                className="mb-8 items-center rounded-lg bg-acmec-red p-3"
                 onPress={handleSubmit(handleonSubmit)}
                 disabled={isLoading}
-                className="overflow-hidden rounded-lg"
               >
-                <LinearGradient
-                  colors={['#e53e3e', '#ed8936']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  className="py-4 px-8 items-center"
-                >
-                  {isLoading ? (
-                    <View className="flex-row items-center">
-                      <ActivityIndicator color="white" />
-                      <Text className="text-white font-bold ml-2">Please wait ...</Text>
-                    </View>
-                  ) : (
-                    <Text className="text-white font-bold">Donate Now</Text>
-                  )}
-                </LinearGradient>
+                {isLoading ? (
+                  <View className="flex-row items-center">
+                    <ActivityIndicator color="white" />
+                    <Text className="ml-2 text-white">Please wait ...</Text>
+                  </View>
+                ) : (
+                  <Text className="font-bold text-white">Donate Now</Text>
+                )}
               </TouchableOpacity>
             </>
           )}
         </View>
-      </View>
-      
-      {!showPersonalAndBilling && (
-        <VerifPanAadhaar 
-          setEdonationVerify={setEdonationVerify} 
-          typeContent={typeContent} 
-          setPanDetails={setPanDetails} 
-          aadhaarDetails={aadhaarDetails} 
-          setAadhaarDetails={setAadhaarDetails} 
-          setShowPersonalAndBilling={setShowPersonalAndBilling} 
-        />
-      )}
-    </ScrollView>
-  );
+
+        {!showPersonalAndBilling && (
+          <VerifPanAadhaarRN
+            setEdonationVerify={setEdonationVerify}
+            typeContent={typeContent}
+            setPanDetails={setPanDetails}
+            aadhaarDetails={aadhaarDetails}
+            setAadhaarDetails={setAadhaarDetails}
+            setShowPersonalAndBilling={setShowPersonalAndBilling}
+          />
+        )}
+      </ScrollView>
+    </SafeAreaView>
+  )
 }
