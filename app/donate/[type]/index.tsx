@@ -1,5 +1,7 @@
 import Breadcrumb from '@/src/components/breadcrumb'
 import { useAuth } from '@/src/context/auth-context'
+import DateTimePicker from '@react-native-community/datetimepicker'
+
 import {
   apiCreateDonations,
   apiDonationTypeBySlug,
@@ -13,10 +15,9 @@ import {
 import { handleApiErrors } from '@/src/utils/helper/api.helper'
 import { generateUUID } from '@/src/utils/helper/glober.helper'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import DateTimePicker from '@react-native-community/datetimepicker'
 import { Link, useLocalSearchParams, useRouter } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Controller, useFieldArray, useForm } from 'react-hook-form'
 import {
   ActivityIndicator,
@@ -155,7 +156,9 @@ export default function DonateType() {
   const [uuid, setUuid] = useState<string>('')
   const [isShowPassword, setIsShowPassword] = useState<boolean>(false)
   const [isAuthStatus, setIsAuthStatus] = useState<boolean>(true)
-  const [selectedDates, setSelectedDates] = useState<any>([new Date()])
+  // const [selectedDates, setSelectedDates] = useState<any>([new Date()])
+  const [selectedDates, setSelectedDates] = useState<any>([null]) // Always at least one, show placeholder
+
   const [includeCourier, setIncludeCourier] = useState(false)
   const [selectedAmount, setSelectedAmount] = useState<number>(0)
   const [qty, setQty] = useState<number>(1)
@@ -178,9 +181,11 @@ export default function DonateType() {
   const maxMembers = 5
   const canAddMore = fields.length < maxMembers
 
-  // Watch form values
+  // --- Watch values ---
   const watchAmount = watch('amount')
   const watchDonationType = watch('donatetype')
+  const watchCountry = watch('country')
+  const watchState = watch('state')
 
   useEffect(() => {
     if (type) donationTypes(type)
@@ -217,6 +222,15 @@ export default function DonateType() {
   useEffect(() => {
     setValue('name', panDetails?.data?.user_full_name)
   }, [panDetails])
+
+  // Dynamically load states whenever country changes
+  useEffect(() => {
+    if (watchCountry) {
+      getStates(watchCountry)
+      setValue('state', '') // Reset state when country changes
+      setStates({})
+    }
+  }, [watchCountry])
 
   useEffect(() => {
     let items = typeContent?.items || []
@@ -430,18 +444,6 @@ export default function DonateType() {
     })
   }
 
-  const formatDateToYMD = (date: any): string => {
-    if (!date) return ''
-
-    const d = date instanceof Date ? date : new Date(date)
-
-    const year = d.getFullYear()
-    const month = String(d.getMonth() + 1).padStart(2, '0')
-    const day = String(d.getDate()).padStart(2, '0')
-
-    return `${year}/${month}/${day}`
-  }
-
   const handleonSubmit = async (data: any) => {
     setIsLoading(true)
 
@@ -546,7 +548,7 @@ export default function DonateType() {
       name: item.name || typeContent?.code,
       count: item.count || 1,
       amount: item.amount || finalAmount,
-      date: item.date || formatDateToYMD(new Date()),
+      // date: item.date || formatDateToYMD(new Date()),
       ...item,
     }))
 
@@ -659,36 +661,42 @@ export default function DonateType() {
     setIsShowPassword(value)
   }
 
-  const addDate = () => {
-    setSelectedDates([...selectedDates, new Date()])
+  // --- Date helpers/handlers, improved UX & state management ---
+  function formatDateToYMD(date: any): string {
+    if (!date) return ''
+    const d = date instanceof Date ? date : new Date(date)
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${year}/${month}/${day}`
   }
-
+  // Adds new empty date for multi-date scenarios
+  const addDate = () => {
+    setSelectedDates([...selectedDates, null])
+  }
+  // Remove a selected date
   const removeDate = (index: number) => {
     setSelectedDates((prevDates: any[]) => {
       const newDates = prevDates.filter((_, i) => i !== index)
-      return newDates
+      return newDates.length ? newDates : [null]
     })
-
     unregister(`date.${index}`)
   }
-
+  // Unified date change handler
   const handleDateChange = (index: number, event: any, selectedDate?: Date) => {
     if (event.type === 'dismissed') {
       setShowDatePicker(null)
       return
     }
-
     if (selectedDate) {
       setSelectedDates((prevDates: any) => {
         const updated = [...prevDates]
         updated[index] = selectedDate
         return updated
       })
-
-      // Update the form value
       setValue(`date.${index}`, selectedDate)
+      setDateError(false)
     }
-
     setShowDatePicker(null)
   }
 
@@ -934,6 +942,7 @@ export default function DonateType() {
             )}
 
             {/* Date selection */}
+            {/* Date selection */}
             {(typeContent?.has_dates || typeContent?.item_has_date) && (
               <View className="mb-4">
                 <Text className="mb-1 text-base text-acmec-red">
@@ -969,8 +978,9 @@ export default function DonateType() {
                       render={({ field: { value, onChange } }) => (
                         <>
                           {showDatePicker === index &&
-                            (typeContent?.date_list ? (
-                              // ✅ Ammavasai Velli → show only allowed API dates
+                            (typeContent?.date_list &&
+                            typeContent.date_list.length > 0 ? (
+                              // ✅ Show allowed API dates
                               Platform.OS === 'web' ? (
                                 <select
                                   value={value || ''}
@@ -1026,7 +1036,7 @@ export default function DonateType() {
                                   )}
                                 </View>
                               )
-                            ) : // ✅ Fallback normal date picker
+                            ) : // ✅ Fallback normal date picker (for trust_id=1 with no date_list)
                             Platform.OS === 'web' ? (
                               <input
                                 type="date"
@@ -1058,13 +1068,16 @@ export default function DonateType() {
                                 value={value ? new Date(value) : new Date()}
                                 mode="date"
                                 display="default"
-                                onChange={(event, selectedDate) => {
+                                onChange={(
+                                  event: { type: string },
+                                  selectedDate: Date | undefined,
+                                ) => {
                                   if (event.type === 'set' && selectedDate) {
                                     handleDateChange(index, event, selectedDate)
                                     onChange(selectedDate.toISOString())
                                   }
                                 }}
-                                minimumDate={new Date()}
+                                minimumDate={new Date()} //for upcoming dates only enabled
                               />
                             ))}
                         </>
