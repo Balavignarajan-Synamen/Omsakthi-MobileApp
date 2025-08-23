@@ -16,7 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import DateTimePicker from '@react-native-community/datetimepicker'
 import { Link, useLocalSearchParams, useRouter } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Controller, useFieldArray, useForm } from 'react-hook-form'
 import {
   ActivityIndicator,
@@ -942,10 +942,20 @@ export default function DonateType() {
 
                 {selectedDates.map((date: Date | null, index: number) => (
                   <View key={index} className="mb-3 flex-row items-center">
-                    {/* Remove button */}
+                    {/* Main Touchable field */}
+                    <TouchableOpacity
+                      className="flex-1 rounded-lg border border-gray-300 bg-white p-2"
+                      onPress={() => setShowDatePicker(index)}
+                    >
+                      <Text className="text-gray-700">
+                        {date ? new Date(date).toDateString() : 'Select a date'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    {/* Remove button for extra dates */}
                     {selectedDates.length > 1 && index !== 0 && (
                       <TouchableOpacity
-                        className="mr-2 rounded-full bg-red-100 p-2"
+                        className="ml-2 rounded-full bg-red-100 p-2"
                         onPress={() => removeDate(index)}
                       >
                         <Text className="text-lg text-red-600">×</Text>
@@ -958,11 +968,75 @@ export default function DonateType() {
                       rules={{ required: 'Date is required' }}
                       render={({ field: { value, onChange } }) => (
                         <>
-                          {typeContent?.date_list ? (
-                            // ✅ Ammavasai Velli → restrict to API dates
+                          {showDatePicker === index &&
+                            (typeContent?.date_list ? (
+                              // ✅ Ammavasai Velli → show only allowed API dates
+                              Platform.OS === 'web' ? (
+                                <select
+                                  value={value || ''}
+                                  onChange={(e) => {
+                                    const newDate = new Date(e.target.value)
+                                    handleDateChange(
+                                      index,
+                                      { type: 'set' },
+                                      newDate,
+                                    )
+                                    onChange(newDate.toISOString())
+                                  }}
+                                  style={{
+                                    padding: 10,
+                                    borderRadius: 8,
+                                    border: '1px solid #ccc',
+                                    marginTop: 6,
+                                    width: '100%',
+                                  }}
+                                >
+                                  <option value="">Select a date</option>
+                                  {typeContent.date_list.map(
+                                    (d: string, i: number) => (
+                                      <option key={i} value={d}>
+                                        {new Date(d).toDateString()}
+                                      </option>
+                                    ),
+                                  )}
+                                </select>
+                              ) : (
+                                <View className="mt-2 rounded-lg border border-gray-300 bg-white p-2">
+                                  {typeContent.date_list.map(
+                                    (d: string, i: number) => (
+                                      <TouchableOpacity
+                                        key={i}
+                                        onPress={() => {
+                                          const newDate = new Date(d)
+                                          handleDateChange(
+                                            index,
+                                            { type: 'set' },
+                                            newDate,
+                                          )
+                                          onChange(newDate.toISOString())
+                                          setShowDatePicker(null)
+                                        }}
+                                        className="py-2"
+                                      >
+                                        <Text className="text-gray-700">
+                                          {new Date(d).toDateString()}
+                                        </Text>
+                                      </TouchableOpacity>
+                                    ),
+                                  )}
+                                </View>
+                              )
+                            ) : // ✅ Fallback normal date picker
                             Platform.OS === 'web' ? (
-                              <select
-                                value={value || ''}
+                              <input
+                                type="date"
+                                value={
+                                  value
+                                    ? new Date(value)
+                                        .toISOString()
+                                        .split('T')[0]
+                                    : ''
+                                }
                                 onChange={(e) => {
                                   const newDate = new Date(e.target.value)
                                   handleDateChange(
@@ -976,18 +1050,9 @@ export default function DonateType() {
                                   padding: 10,
                                   borderRadius: 8,
                                   border: '1px solid #ccc',
-                                  width: '100%',
+                                  marginTop: 6,
                                 }}
-                              >
-                                <option value="">Select a date</option>
-                                {typeContent.date_list.map(
-                                  (d: string, i: number) => (
-                                    <option key={i} value={d}>
-                                      {new Date(d).toDateString()}
-                                    </option>
-                                  ),
-                                )}
-                              </select>
+                              />
                             ) : (
                               <DateTimePicker
                                 value={value ? new Date(value) : new Date()}
@@ -995,81 +1060,13 @@ export default function DonateType() {
                                 display="default"
                                 onChange={(event, selectedDate) => {
                                   if (event.type === 'set' && selectedDate) {
-                                    const allowed = typeContent.date_list.some(
-                                      (d: string) =>
-                                        new Date(d).toDateString() ===
-                                        selectedDate.toDateString(),
-                                    )
-                                    if (allowed) {
-                                      handleDateChange(
-                                        index,
-                                        event,
-                                        selectedDate,
-                                      )
-                                      onChange(selectedDate.toISOString())
-                                    } else {
-                                      alert(
-                                        'Only Ammavasai Velli dates are allowed.',
-                                      )
-                                    }
+                                    handleDateChange(index, event, selectedDate)
+                                    onChange(selectedDate.toISOString())
                                   }
                                 }}
-                                minimumDate={new Date(typeContent.date_list[0])}
-                                maximumDate={
-                                  new Date(
-                                    typeContent.date_list[
-                                      typeContent.date_list.length - 1
-                                    ],
-                                  )
-                                }
+                                minimumDate={new Date()}
                               />
-                            )
-                          ) : // ✅ Normal case → free DateTimePicker
-                          Platform.OS === 'web' ? (
-                            <input
-                              type="date"
-                              value={
-                                value
-                                  ? new Date(value).toISOString().split('T')[0]
-                                  : ''
-                              }
-                              onChange={(e) => {
-                                const newDate = new Date(e.target.value)
-                                handleDateChange(
-                                  index,
-                                  { type: 'set' },
-                                  newDate,
-                                )
-                                onChange(newDate.toISOString())
-                              }}
-                              style={{
-                                padding: 10,
-                                borderRadius: 8,
-                                border: '1px solid #ccc',
-                                width: '100%',
-                              }}
-                            />
-                          ) : (
-                            <DateTimePicker
-                              value={value ? new Date(value) : new Date()}
-                              mode="date"
-                              // display="default"
-                              onChange={(event, selectedDate) => {
-                                if (event.type === 'set' && selectedDate) {
-                                  handleDateChange(index, event, selectedDate)
-                                  onChange(selectedDate.toISOString())
-                                }
-                              }}
-                              minimumDate={new Date()}
-                            />
-                          )}
-
-                          {/* Placeholder text */}
-                          {!value && (
-                            <Text className="mt-2 text-gray-700">
-                              Select a date
-                            </Text>
-                          )}
+                            ))}
                         </>
                       )}
                     />
