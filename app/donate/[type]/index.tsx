@@ -801,24 +801,26 @@ export default function DonateType() {
         </View>
 
         <View className="space-y-4">
-          <View className="my-3 flex-row items-center">
-            <Switch
-              value={isShowPassword}
-              onValueChange={handleCreateAccount}
-              trackColor={{ false: '#767577', true: '#81b0ff' }}
-            />
-            <Text className="ml-2 text-base font-medium text-gray-800">
-              Create new user account? {''}
-              If already have an account, Click{' '}
-              <Link href={'/login'} className="text-acmec-red">
-                here
-              </Link>{' '}
-              to login
-            </Text>
-          </View>
+          {isAuthStatus && (
+            <View className="my-3 flex-row items-center">
+              <Switch
+                value={isShowPassword}
+                onValueChange={handleCreateAccount}
+                trackColor={{ false: '#767577', true: '#81b0ff' }}
+              />
+              <Text className="ml-2 text-base font-medium text-gray-800">
+                Create new user account? {''}
+                If already have an account, Click{' '}
+                <Link href={'/login'} className="text-acmec-red">
+                  here
+                </Link>{' '}
+                to login
+              </Text>
+            </View>
+          )}
 
           {/* Dynamic Inputs */}
-          <View className="mt-5 rounded-lg border border-acmec-yellow bg-white p-4 shadow-md">
+          <View className="mt-5 rounded-lg border border-acmec-yellow bg-acmec-yellow/10 p-4">
             {/* Fixed amount - non-editable */}
             {fixedAmount !== null && (
               <>
@@ -942,7 +944,6 @@ export default function DonateType() {
             )}
 
             {/* Date selection */}
-            {/* Date selection */}
             {(typeContent?.has_dates || typeContent?.item_has_date) && (
               <View className="mb-4">
                 <Text className="mb-1 text-base text-acmec-red">
@@ -980,7 +981,7 @@ export default function DonateType() {
                           {showDatePicker === index &&
                             (typeContent?.date_list &&
                             typeContent.date_list.length > 0 ? (
-                              // ✅ Show allowed API dates
+                              // Show allowed API dates
                               Platform.OS === 'web' ? (
                                 <select
                                   value={value || ''}
@@ -1036,7 +1037,7 @@ export default function DonateType() {
                                   )}
                                 </View>
                               )
-                            ) : // ✅ Fallback normal date picker (for trust_id=1 with no date_list)
+                            ) : // Fallback normal date picker
                             Platform.OS === 'web' ? (
                               <input
                                 type="date"
@@ -1186,7 +1187,7 @@ export default function DonateType() {
             {typeContent?.has_items &&
               typeContent?.items &&
               !typeContent?.item_has_count &&
-              !typeContent?.item_has_description && (
+              typeContent?.item_has_description && (
                 <>
                   <View className="mb-4">
                     <Text className="mb-1 text-base text-acmec-red">
@@ -1374,15 +1375,17 @@ export default function DonateType() {
                         onValueChange={(value) => {
                           setIncludeDailyAbhisegam(value)
                           if (value) {
-                            const params = { trust_id: trustId }
-                            apiDonationTypeBySlug('daily-abhishegam', params)
+                            apiDonationTypeBySlug(
+                              'daily-abhishegam',
+                              params?.id,
+                            )
                               .then((res: any) => {
                                 setDailyAbhisegamAmount(res.data?.amount || 0)
                               })
                               .catch((err: any) => {
                                 const message: string | null =
                                   handleApiErrors(err)
-                                if (message) console.error(message)
+                                if (message) Alert.alert('Error', message)
                               })
                           } else {
                             setDailyAbhisegamAmount(0)
@@ -1662,7 +1665,7 @@ export default function DonateType() {
                         required: 'Email is required',
                         pattern: {
                           value:
-                            /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/,
+                            /^[a-zA-Z00._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/,
                           message: 'Invalid email address',
                         },
                       }}
