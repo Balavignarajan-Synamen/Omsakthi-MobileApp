@@ -1,3 +1,7 @@
+import { apiGetTrusts } from '@/src/services/api'
+import { FontAwesome } from '@expo/vector-icons'
+import { LinearGradient } from 'expo-linear-gradient'
+import { Link } from 'expo-router'
 import React, { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
@@ -8,14 +12,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
-import Swiper from 'react-native-swiper'
-// import { apiCmsHomeSlider, apiGetTrusts } from "../services/api";
-import { apiGetTrusts } from '@/src/services/api'
-import { FontAwesome } from '@expo/vector-icons'
-import { LinearGradient } from 'expo-linear-gradient'
 import { SafeAreaView } from 'react-native-safe-area-context'
-
-import { Link } from 'expo-router'
+import Swiper from 'react-native-swiper'
 import 'setimmediate'
 
 const { width } = Dimensions.get('window')
@@ -28,9 +26,6 @@ type Trust = {
 }
 
 export default function HomeScreen() {
-  // const [sliders, setSliders] = useState<any[]>([])
-  const [isSliderLoading, setIsSliderLoading] = useState(true)
-
   const [trustData, setTrustData] = useState<Trust[]>([])
   const [isTrustLoading, setIsTrustLoading] = useState(true)
 
@@ -38,22 +33,9 @@ export default function HomeScreen() {
   const [isTestimonialLoading, setIsTestimonialLoading] = useState(true)
 
   useEffect(() => {
-    // fetchSliders()
     fetchTrusts()
     fetchTestimonials()
   }, [])
-
-  // const fetchSliders = async () => {
-  //   try {
-  //     setIsSliderLoading(true)
-  //     const res = await apiCmsHomeSlider('home_main')
-  //     setSliders(res.data?.slides || [])
-  //   } catch (err) {
-  //     console.error('Slider API Error', err)
-  //   } finally {
-  //     setIsSliderLoading(false)
-  //   }
-  // }
 
   const fetchTrusts = async () => {
     try {
@@ -94,140 +76,137 @@ export default function HomeScreen() {
   }
 
   return (
-    // <FlatList
-      // ListHeaderComponent={
-        // <View className="flex-1 max-h he bg-[#FD580B1F]">
-        <SafeAreaView className="flex-1 border-none bg-[#FD580B1F]">
-          {/* Section 1: Trusts */}
-          <Text className="my-6 text-center text-xl font-bold  text-acmec-red md:text-3xl">
-            Donate to Our Trusts
-          </Text>
-          {isTrustLoading ? (
-            <ActivityIndicator size="large" className="my-6" />
-          ) : (
-            <FlatList
-              data={trustData}
-              keyExtractor={(item) => item.id.toString()}
-              numColumns={width > 768 ? 2 : 1} // ✅ 2 per row for tablet, 1 for mobile
-              columnWrapperStyle={
-                width > 768 ? { justifyContent: 'space-around' } : undefined
-              }
-              renderItem={({ item }) => (
-                <Link href={`/donate?trust_id=${item.id}`} asChild>
-                  <TouchableOpacity
-                    className="m-2 flex-1 overflow-hidden rounded-2xl"
-                    activeOpacity={0.9}
-                  >
+    <SafeAreaView className="flex-1 bg-[#FD580B1F]">
+      {isTrustLoading ? (
+        <ActivityIndicator size="large" className="my-6" />
+      ) : (
+        <FlatList
+          data={trustData}
+          keyExtractor={(item) => item.id.toString()}
+          numColumns={width > 768 ? 2 : 1}
+          columnWrapperStyle={
+            width > 768 ? { justifyContent: 'space-around' } : undefined
+          }
+          renderItem={({ item }) => (
+            <Link href={`/donate?trust_id=${item.id}`} asChild>
+              <TouchableOpacity
+                className="m-2 flex-1 overflow-hidden rounded-2xl"
+                activeOpacity={0.9}
+              >
+                <LinearGradient
+                  colors={['#a7150bf2', '#fd580bf2']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  className="rounded-2xl p-4"
+                >
+                  <View className="items-center">
+                    {item.logo ? (
+                      <Image
+                        source={{ uri: item.logo }}
+                        className="mb-3 h-20 w-20 rounded-full border-2 border-acmec-yellow"
+                        resizeMode="contain"
+                      />
+                    ) : (
+                      <View className="mb-3 h-16 w-16 items-center justify-center rounded-full bg-acmec-yellow">
+                        <FontAwesome name="heart-o" size={18} color="red" />
+                      </View>
+                    )}
+                  </View>
+
+                  <Text className="mb-2 text-center text-lg font-bold text-white">
+                    {item.name}
+                  </Text>
+                  <Text className="text-center text-sm text-white">
+                    {item.description}
+                  </Text>
+                  <View className="mt-4 items-center">
                     <LinearGradient
+                      colors={['#FFD600', '#ff6500']}
+                      end={{ x: 1, y: 1 }}
+                      style={{ padding: 4, borderRadius: 12 }}
+                    >
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          paddingHorizontal: 24,
+                          paddingVertical: 8,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            marginRight: 8,
+                            fontSize: 18,
+                            fontWeight: 'bold',
+                            color: '#fff',
+                          }}
+                        >
+                          Donate Now
+                        </Text>
+                        <FontAwesome
+                          name="arrow-right"
+                          size={18}
+                          color="#fff"
+                        />
+                      </View>
+                    </LinearGradient>
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
+            </Link>
+          )}
+          // ✅ Add header + footer content here
+          ListHeaderComponent={
+            <>
+              <Text className="my-6 text-center text-xl font-bold text-acmec-red md:text-3xl">
+                Donate to Our Trusts
+              </Text>
+            </>
+          }
+          ListFooterComponent={
+            <>
+              <Text className="my-6 text-center text-xl font-bold text-acmec-red md:text-3xl">
+                Amma's Messages
+              </Text>
+              <Text className="mx-auto my-4 text-center text-lg text-gray-700">
+                Inspiring words of wisdom from Amma to guide us on our spiritual
+                journey
+              </Text>
+
+              {isTestimonialLoading ? (
+                <ActivityIndicator size="large" className="my-6" />
+              ) : (
+                <Swiper
+                  autoplay
+                  autoplayTimeout={7}
+                  loop
+                  height={250}
+                  showsPagination
+                  activeDotColor="#FF9800"
+                >
+                  {testimonials.map((t, i) => (
+                    <LinearGradient
+                      key={i}
                       colors={['#a7150bf2', '#fd580bf2']}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
-                      className="rounded-2xl p-4"
+                      className="mx-6 my-4 items-center justify-center rounded-2xl p-6"
                     >
-                      <View className="items-center">
-                        {item.logo ? (
-                          <Image
-                            source={{ uri: item.logo }}
-                            className="mb-3 h-20 w-20 rounded-full border-2 border-acmec-yellow"
-                            resizeMode="contain"
-                          />
-                        ) : (
-                          <View className="mb-3 h-16 w-16 items-center justify-center rounded-full bg-acmec-yellow">
-                            <FontAwesome name="heart-o" size={18} color="red" />
-                          </View>
-                        )}
-                      </View>
-
-                      <Text className="mb-2 text-center text-lg font-bold text-white">
-                        {item.name}
+                      <Text className="mb-4 text-center italic text-white">
+                        "{t.message}"
                       </Text>
-                      <Text className="text-center text-sm text-white">
-                        {item.description}
+                      <Text className="text-center text-lg font-bold text-acmec-yellow">
+                        {t.name}
                       </Text>
-                      <View className="mt-4 items-center">
-                        <LinearGradient
-                          colors={['#FFD600', '#ff6500']}
-                          end={{ x: 1, y: 1 }}
-                          style={{ padding: 4, borderRadius: 12 }} // <-- border radius here
-                        >
-                          <View
-                            style={{
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              paddingHorizontal: 24,
-                              paddingVertical: 8,
-                            }}
-                          >
-                            <Text
-                              style={{
-                                marginRight: 8,
-                                fontSize: 18,
-                                fontWeight: 'bold',
-                                color: '#fff',
-                              }}
-                            >
-                              Donate Now
-                            </Text>
-                            <FontAwesome
-                              name="arrow-right"
-                              size={18}
-                              color="#fff"
-                            />
-                          </View>
-                        </LinearGradient>
-                      </View>
                     </LinearGradient>
-                  </TouchableOpacity>
-                </Link>
+                  ))}
+                </Swiper>
               )}
-            />
-          )}
-
-          {/* Section 2: Testimonials */}
-          <Text className="my-6 text-center text-xl font-bold text-acmec-red md:text-3xl">
-            Amma's Messages
-          </Text>
-
-          <Text
-            className="animate-slide-up mx-auto  my-4 text-center text-lg text-gray-700"
-            style={{ animationDelay: '0.2s' }}
-          >
-            Inspiring words of wisdom from Amma to guide us on our spiritual
-            journey
-          </Text>
-          {isTestimonialLoading ? (
-            <ActivityIndicator size="large" className="my-6" />
-          ) : (
-            <Swiper
-              autoplay
-              autoplayTimeout={7}
-              loop
-              height={250}
-              showsPagination
-              activeDotColor="#FF9800"
-            >
-              {testimonials.map((t, i) => (
-                <LinearGradient
-                  key={i}
-                  colors={['#a7150bf2', '#fd580bf2']} // 95% opacity in hex: F2
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  className="mx-6 my-4 items-center justify-center rounded-2xl p-6"
-                >
-                  <Text className="mb-4 text-center italic text-white">
-                    "{t.message}"
-                  </Text>
-                  <Text className="text-center text-lg font-bold text-acmec-yellow">
-                    {t.name}
-                  </Text>
-                </LinearGradient>
-              ))}
-            </Swiper>
-          )}
-        </SafeAreaView>
+            </>
+          }
+          contentContainerStyle={{ paddingBottom: 40 }}
+        />
       )}
-      // data={[]} // no list, just using FlatList for scroll
-      // renderItem={null}
-    // />
-  // )
-// }
+    </SafeAreaView>
+  )
+}

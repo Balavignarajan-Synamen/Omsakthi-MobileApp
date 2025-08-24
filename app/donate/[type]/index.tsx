@@ -1,6 +1,7 @@
 import Breadcrumb from '@/src/components/breadcrumb'
 import { useAuth } from '@/src/context/auth-context'
 import DateTimePicker from '@react-native-community/datetimepicker'
+// import RazorpayCheckout from 'react-native-razorpay'
 
 import {
   apiCreateDonations,
@@ -33,6 +34,7 @@ import {
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import WebView from 'react-native-webview'
 import DonateCheckout from './checkout'
 import DonateReceipt from './receipt'
 import VerifPanAadhaarRN from './verify-pan-aadhaar'
@@ -172,6 +174,7 @@ export default function DonateType() {
   const [showDatePicker, setShowDatePicker] = useState<number | null>(null)
   const [userAuthStatus, setUserAuthStatus] = useState<boolean>(false)
   const [fixedAmount, setFixedAmount] = useState<number | null>(null)
+  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null)
 
   const { fields, append, remove } = useFieldArray({
     control,
@@ -624,18 +627,18 @@ export default function DonateType() {
   }
 
   const payRazorpay = () => {
-    setIsCheckoutLoading(true)
     const postData = { donation_id: donationInfo?.id }
+
     apiRazorpayCreate(postData)
       .then((res: any) => {
-        // Razorpay integration would go here
-        Alert.alert('Payment', 'Razorpay integration would be implemented here')
-        setIsCheckoutLoading(false)
+        // Razorpay Web Checkout URL
+        const webUrl = `https://api.razorpay.com/v1/checkout/embedded?order_id=${res.data.razorpay_order_id}&key=${res.data.razorpay_key}`
+
+        setCheckoutUrl(webUrl) // open in WebView
       })
-      .catch((err: any) => {
-        const message: string | null = handleApiErrors(err)
-        if (message) console.error(message)
-        setIsCheckoutLoading(false)
+      .catch((err) => {
+        const message = handleApiErrors(err)
+        if (message) alert(message)
       })
   }
 
@@ -758,6 +761,25 @@ export default function DonateType() {
     )
   }
 
+  if (checkoutUrl) {
+    return (
+      <WebView
+        source={{ uri: checkoutUrl }}
+        onNavigationStateChange={(event) => {
+          // Razorpay redirects here after payment
+          if (event.url.includes('payment_success')) {
+            alert('Payment Successful 🎉')
+            setCheckoutUrl(null)
+          }
+          if (event.url.includes('payment_failed')) {
+            alert('Payment Failed ❌')
+            setCheckoutUrl(null)
+          }
+        }}
+      />
+    )
+  }
+
   if (screenType === 'checkout') {
     return (
       <>
@@ -765,7 +787,7 @@ export default function DonateType() {
         <DonateCheckout
           donationInfo={donationInfo}
           setIsCheckoutLoading={setIsCheckoutLoading}
-          isCheckoutLoading={isCheckoutLoading}
+          isCheckoutLoading={false}
           payRazorpay={payRazorpay}
         />
       </>

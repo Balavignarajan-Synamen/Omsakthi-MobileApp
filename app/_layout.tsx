@@ -1,35 +1,57 @@
 // app/_layout.tsx
-import { Slot } from "expo-router";
-import React from "react";
-import { SafeAreaView, ScrollView, View, useWindowDimensions } from "react-native";
-import "../global.css";
+import { Slot } from 'expo-router'
+import React from 'react'
+import {
+  SafeAreaView,
+  ScrollView,
+  View,
+  useWindowDimensions,
+} from 'react-native'
+import '../global.css'
 
-import Footer from "@/src/components/Footer";
+import Footer from '@/src/components/Footer'
 import {
   HeaderFollowBar,
   HeaderLogoBar,
   HeaderProfileBar,
-} from "@/src/components/Header";
+} from '@/src/components/Header'
 
-import { AuthProvider } from "@/src/context/auth-context";
+import { AuthProvider } from '@/src/context/auth-context'
 // import { TrustProvider } from "@/src/context/trustContext";
-import { TrustProvider } from "@/src/context/trust-context";
+import { TrustProvider } from '@/src/context/trust-context'
+import { LogBox } from 'react-native'
 
 export default function RootLayout() {
-  const { width } = useWindowDimensions();
+  const { width } = useWindowDimensions()
+
+  // Ignore warning UI
+  LogBox.ignoreLogs(['VirtualizedLists should never be nested'])
+
+  // Also silence it in the Metro console
+  const ignoredWarnings = ['VirtualizedLists should never be nested']
+  const originalConsoleError = console.error
+  console.error = (...args) => {
+    if (
+      typeof args[0] === 'string' &&
+      ignoredWarnings.some((msg) => args[0].includes(msg))
+    ) {
+      return
+    }
+    originalConsoleError(...args)
+  }
 
   // Responsive logic
-  const isTablet = width >= 768;
-  const isDesktop = width >= 1024;
+  const isTablet = width >= 768
+  const isDesktop = width >= 1024
 
   return (
     <TrustProvider>
       <AuthProvider>
-        <SafeAreaView style={{ flex: 1, backgroundColor: "#FD580B1F" }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
           <ScrollView
             contentContainerStyle={{
               flexGrow: 1,
-              justifyContent: "space-between",
+              justifyContent: 'space-between',
             }}
             showsVerticalScrollIndicator={false}
           >
@@ -64,5 +86,5 @@ export default function RootLayout() {
         </SafeAreaView>
       </AuthProvider>
     </TrustProvider>
-  );
+  )
 }

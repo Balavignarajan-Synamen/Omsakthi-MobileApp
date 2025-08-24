@@ -2,6 +2,7 @@
 import Breadcrumb from '@/src/components/breadcrumb'
 import { apiDonationTypes } from '@/src/services/api'
 import { handleApiErrors } from '@/src/utils/helper/api.helper'
+import { FontAwesome } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Link, useLocalSearchParams } from 'expo-router'
 import { useEffect, useState } from 'react'
@@ -53,7 +54,7 @@ export default function Donate() {
 
       {/* Title */}
       <View className="mt-6 items-center">
-        <Text className="text-2xl font-bold text-acmec-red">Donate Now</Text>
+        <Text className="text-2xl font-bold text-acmec-red">Donate Now 💛</Text>
         <View className="mt-2 h-1 w-20 bg-gradient-to-r from-acmec-red to-acmec-orange" />
       </View>
 
@@ -81,28 +82,51 @@ export default function Donate() {
             >
               <TouchableOpacity
                 activeOpacity={0.9}
-                className="m-2 flex-1 overflow-hidden rounded-2xl"
+                className="m-2 flex-1 overflow-hidden "
               >
                 <LinearGradient
                   colors={['#ffffff', '#fff7e6']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  className="rounded-2xl border-2 border-acmec-yellow p-6"
+                  className="rounded-md border-2 border-acmec-yellow p-6"
                 >
                   <View className="items-center">
-                    {/* Fake Icon Example — replace with your icons */}
-                    {/* <View className="w-16 h-16 rounded-full bg-red- items-center justify-center mb-3"> */}
                     <Text className="text-xl text-acmec-red">🙏</Text>
-                    {/* <FontAwesome name="heart-o" size={18} color="red" /> */}
-                    {/* </View> */}
 
                     <Text className="mb-2 text-center text-lg font-bold text-acmec-red">
                       {item.name}
                     </Text>
 
-                    <View className="mt-2 rounded-lg bg-gradient-to-r from-acmec-yellow to-acmec-orange px-4 py-2">
-                      <Text className="font-bold text-white">Donate Now →</Text>
-                    </View>
+                    <LinearGradient
+                      colors={['#FFD600', '#ff6500']}
+                      end={{ x: 1, y: 1 }}
+                      style={{ padding: 4, borderRadius: 12 }}
+                    >
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          paddingHorizontal: 24,
+                          paddingVertical: 8,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            marginRight: 8,
+                            fontSize: 14,
+                            fontWeight: 'bold',
+                            color: '#fff',
+                          }}
+                        >
+                          Donate Now
+                        </Text>
+                        <FontAwesome
+                          name="arrow-right"
+                          size={18}
+                          color="#fff"
+                        />
+                      </View>
+                    </LinearGradient>
                   </View>
                 </LinearGradient>
               </TouchableOpacity>
