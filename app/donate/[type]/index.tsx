@@ -1,6 +1,8 @@
 import Breadcrumb from '@/src/components/breadcrumb'
 import { useAuth } from '@/src/context/auth-context'
 import DateTimePicker from '@react-native-community/datetimepicker'
+import * as FileSystem from 'expo-file-system'
+import * as Sharing from 'expo-sharing'
 // import RazorpayCheckout from 'react-native-razorpay'
 
 import {
@@ -686,6 +688,7 @@ export default function DonateType() {
 
   const getDonationReceipt = async () => {
     setIsReceiptLoading(true)
+
     const postData = {
       donation_id: donationInfo?.id,
       uuid: await AsyncStorage.getItem('uuid'),
@@ -693,10 +696,29 @@ export default function DonateType() {
 
     try {
       const response = await apiGetReceipt(postData)
-      Alert.alert('Receipt', 'Receipt downloaded successfully')
+
+      // 👇 Expecting your API to return a PDF URL
+      const receiptUrl = response?.data?.receipt_url
+      if (!receiptUrl) {
+        Alert.alert('Error', 'No receipt URL found from server')
+        return
+      }
+
+      const fileUri = `${FileSystem.documentDirectory}receipt_${donationInfo?.id}.pdf`
+
+      // 👇 Download the PDF from backend
+      const { uri } = await FileSystem.downloadAsync(receiptUrl, fileUri)
+
+      // 👇 Share / open PDF
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri)
+      } else {
+        Alert.alert('Downloaded', `Receipt saved at: ${uri}`)
+      }
     } catch (error) {
       const message: string | null = handleApiErrors(error)
       if (message) console.error(message)
+      Alert.alert('Error', 'Failed to download receipt')
     } finally {
       setIsReceiptLoading(false)
     }
@@ -1729,7 +1751,7 @@ export default function DonateType() {
                         required: 'Email is required',
                         pattern: {
                           value:
-                            /^[a-zA-Z00._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/,
+                            /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
                           message: 'Invalid email address',
                         },
                       }}
@@ -1743,6 +1765,7 @@ export default function DonateType() {
                         />
                       )}
                     />
+
                     {errors.email && (
                       <Text className="text-xs text-acmec-red">
                         {(errors.email as any).message}

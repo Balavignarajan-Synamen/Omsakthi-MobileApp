@@ -159,7 +159,7 @@ export default function HomeScreen() {
           ListHeaderComponent={
             <>
               <Text className="my-6 text-center text-xl font-bold text-acmec-red md:text-3xl">
-                Donate to Our Trusts
+                Donate to Our Trusts 🙏
               </Text>
             </>
           }

@@ -38,3 +38,4 @@ omsakthi-mobileapp/
 update apk command
 >>npx expo install eas-cli
 >>npx eas build -p android --profile preview
+>>email have the issue in length (if 5 words below its working if more words its validation error)
