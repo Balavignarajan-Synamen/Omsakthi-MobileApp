@@ -1,6 +1,12 @@
 import { router } from 'expo-router'
 import React from 'react'
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import {
+  ImageBackground,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native'
 
 interface BreadcrumbItem {
   label: string
@@ -16,7 +22,11 @@ interface BreadcrumbProps {
 
 export default function Breadcrumb({ breadcrumb }: BreadcrumbProps) {
   return (
-    <View style={styles.background}>
+    <ImageBackground
+      source={require('../../assets/images/temple.png')}
+      style={styles.background}
+      resizeMode="cover"
+    >
       <View style={styles.container}>
         <Text style={styles.title}>{breadcrumb.title}</Text>
 
@@ -24,7 +34,7 @@ export default function Breadcrumb({ breadcrumb }: BreadcrumbProps) {
           {breadcrumb?.path?.map((item, index) => {
             const isFirst = index === 0
             const isLast = index === breadcrumb.path.length - 1
-            const hasLink = item.link !== undefined && item.link !== null
+            const hasLink = item.link !== undefined && item.link !== null // Check for both existence and non-null
 
             return (
               <View key={index} style={styles.breadcrumbItem}>
@@ -53,16 +63,15 @@ export default function Breadcrumb({ breadcrumb }: BreadcrumbProps) {
           })}
         </View>
       </View>
-    </View>
+    </ImageBackground>
   )
 }
 
 const styles = StyleSheet.create({
   background: {
-    height: 160, // h-40
+    height: 160, // like h-40
     width: '100%',
     justifyContent: 'center',
-    backgroundColor: '#1E3A8A', // deep blue background (change as needed)
   },
   container: {
     flex: 1,
@@ -81,7 +90,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
-    justifyContent: 'center',
   },
   breadcrumbItem: {
     flexDirection: 'row',
