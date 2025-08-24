@@ -65,7 +65,9 @@ export default function DonateCheckout({
           <View className="rounded-lg border border-gray-200 bg-white p-5">
             <View className="gap-5">
               <View>
-                <Text className="text-base font-bold text-acmec-red">Name</Text>
+                <Text className="text-base font-bold text-acmec-red">
+                  Name*
+                </Text>
                 <Text className="text-gray-700">
                   {donationInfo?.first_name ?? '-'}
                 </Text>

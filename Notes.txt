@@ -32,3 +32,9 @@ omsakthi-mobileapp/
 3. thaipoosam count add number input
 4. Masa/ammavasai veli = only show specific date based on api
 5. amount default somethind shows in place holder 
+
+
+
+update apk command
+>>npx expo install eas-cli
+>>npx eas build -p android --profile preview

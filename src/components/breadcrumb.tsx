@@ -23,7 +23,7 @@ interface BreadcrumbProps {
 export default function Breadcrumb({ breadcrumb }: BreadcrumbProps) {
   return (
     <ImageBackground
-      source={require('../../assets/images/temple.png')}
+      source={require('../../assets/images/temple.webp')}
       style={styles.background}
       resizeMode="cover"
     >

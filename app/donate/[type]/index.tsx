@@ -9,6 +9,7 @@ import {
   apiGetCountries,
   apiGetReceipt,
   apiGetStates,
+  apiRazorpayCallback,
   apiRazorpayCreate,
   apiUserProfile,
   apiUserRegister,
@@ -33,6 +34,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
+import RazorpayCheckout from 'react-native-razorpay'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import WebView from 'react-native-webview'
 import DonateCheckout from './checkout'
@@ -627,18 +629,58 @@ export default function DonateType() {
   }
 
   const payRazorpay = () => {
+    setIsCheckoutLoading(true)
+
     const postData = { donation_id: donationInfo?.id }
 
     apiRazorpayCreate(postData)
       .then((res: any) => {
-        // Razorpay Web Checkout URL
-        const webUrl = `https://api.razorpay.com/v1/checkout/embedded?order_id=${res.data.razorpay_order_id}&key=${res.data.razorpay_key}`
+        const options = {
+          key: res.data.razorpay_key,
+          order_id: res.data.razorpay_order_id,
+          name: 'Your Trust Name',
+          description: 'Donation Payment',
+          prefill: {
+            name: `${donationInfo?.first_name} ${donationInfo?.last_name || ''}`,
+            contact: donationInfo?.phone,
+            email: donationInfo?.email,
+          },
+          theme: {
+            color: '#3399cc',
+          },
+        }
 
-        setCheckoutUrl(webUrl) // open in WebView
+        RazorpayCheckout.open(options as any)
+          .then((response: any) => {
+            // success
+            const callbackRequest = {
+              donation_id: donationInfo?.id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            }
+
+            apiRazorpayCallback(callbackRequest)
+              .then(() => {
+                setScreenType('receipt')
+                setIsCheckoutLoading(false)
+              })
+              .catch((err: any) => {
+                const message = handleApiErrors(err)
+                if (message) alert(message)
+                setIsCheckoutLoading(false)
+              })
+          })
+          .catch((error: any) => {
+            // user cancelled or failed
+            setIsCheckoutLoading(false)
+            alert(error.description || 'Payment cancelled')
+          })
       })
-      .catch((err) => {
+      .catch((err: any) => {
         const message = handleApiErrors(err)
         if (message) alert(message)
+        setIsCheckoutLoading(false)
       })
   }
 
