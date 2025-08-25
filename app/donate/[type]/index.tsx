@@ -640,7 +640,7 @@ export default function DonateType() {
         const options = {
           key: res.data.razorpay_key,
           order_id: res.data.razorpay_order_id,
-          name: 'Your Trust Name',
+          name: 'Omsakthi',
           description: 'Donation Payment',
           prefill: {
             name: `${donationInfo?.first_name} ${donationInfo?.last_name || ''}`,
@@ -686,43 +686,42 @@ export default function DonateType() {
       })
   }
 
-  const getDonationReceipt = async () => {
-    setIsReceiptLoading(true)
+const getDonationReceipt = async () => {
+  setIsReceiptLoading(true)
 
+  try {
+    const uuid = await AsyncStorage.getItem('uuid')
     const postData = {
       donation_id: donationInfo?.id,
-      uuid: await AsyncStorage.getItem('uuid'),
+      uuid: uuid,
     }
 
-    try {
-      const response = await apiGetReceipt(postData)
+    const response = await apiGetReceipt(postData)
 
-      // 👇 Expecting your API to return a PDF URL
-      const receiptUrl = response?.data?.receipt_url
-      if (!receiptUrl) {
-        Alert.alert('Error', 'No receipt URL found from server')
-        return
-      }
+    // ✅ Convert response to Base64 and save as PDF
+    const fileUri = `${FileSystem.documentDirectory}receipt_${donationInfo?.id}.pdf`
 
-      const fileUri = `${FileSystem.documentDirectory}receipt_${donationInfo?.id}.pdf`
+    await FileSystem.writeAsStringAsync(
+      fileUri,
+      response.data, // should be Base64 from backend
+      { encoding: FileSystem.EncodingType.Base64 }
+    )
 
-      // 👇 Download the PDF from backend
-      const { uri } = await FileSystem.downloadAsync(receiptUrl, fileUri)
-
-      // 👇 Share / open PDF
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri)
-      } else {
-        Alert.alert('Downloaded', `Receipt saved at: ${uri}`)
-      }
-    } catch (error) {
-      const message: string | null = handleApiErrors(error)
-      if (message) console.error(message)
-      Alert.alert('Error', 'Failed to download receipt')
-    } finally {
-      setIsReceiptLoading(false)
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(fileUri)
+    } else {
+      Alert.alert('Downloaded', `Receipt saved at: ${fileUri}`)
     }
+  } catch (error) {
+    const message: string | null = handleApiErrors(error)
+    if (message) console.error(message)
+    Alert.alert('Error', 'Failed to download receipt')
+  } finally {
+    setIsReceiptLoading(false)
   }
+}
+
+
 
   const handleCreateAccount = (value: boolean) => {
     setIsShowPassword(value)
