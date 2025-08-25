@@ -1,6 +1,7 @@
 import Breadcrumb from '@/src/components/breadcrumb'
 import { useAuth } from '@/src/context/auth-context'
 import DateTimePicker from '@react-native-community/datetimepicker'
+import { Buffer } from "buffer"
 import * as FileSystem from 'expo-file-system'
 import * as Sharing from 'expo-sharing'
 // import RazorpayCheckout from 'react-native-razorpay'
@@ -690,37 +691,51 @@ const getDonationReceipt = async () => {
   setIsReceiptLoading(true)
 
   try {
-    const uuid = await AsyncStorage.getItem('uuid')
+    const uuid = await AsyncStorage.getItem("uuid")
     const postData = {
       donation_id: donationInfo?.id,
       uuid: uuid,
     }
 
-    const response = await apiGetReceipt(postData)
+    // 👇 Force axios to download as binary (arraybuffer)
+    const response = await apiGetReceipt(postData, {
+      responseType: "arraybuffer",
+    })
 
-    // ✅ Convert response to Base64 and save as PDF
+    // Convert ArrayBuffer → Base64
+    const base64Data = Buffer.from(response.data, "binary").toString("base64")
+
+    // Save file in app storage
     const fileUri = `${FileSystem.documentDirectory}receipt_${donationInfo?.id}.pdf`
+    await FileSystem.writeAsStringAsync(fileUri, base64Data, {
+      encoding: FileSystem.EncodingType.Base64,
+    })
 
-    await FileSystem.writeAsStringAsync(
-      fileUri,
-      response.data, // should be Base64 from backend
-      { encoding: FileSystem.EncodingType.Base64 }
-    )
-
+    // Share / open file
     if (await Sharing.isAvailableAsync()) {
       await Sharing.shareAsync(fileUri)
     } else {
-      Alert.alert('Downloaded', `Receipt saved at: ${fileUri}`)
+      Alert.alert("Downloaded", `Receipt saved at: ${fileUri}`)
     }
-  } catch (error) {
-    const message: string | null = handleApiErrors(error)
-    if (message) console.error(message)
-    Alert.alert('Error', 'Failed to download receipt')
+  } catch (error: any) {
+    console.error("Receipt download error:", error)
+
+    // Extract server response if available
+    if (error.response) {
+      const serverMessage =
+        error.response.data?.message ||
+        JSON.stringify(error.response.data) ||
+        "Unknown server error"
+      Alert.alert("Server Error", serverMessage)
+    } else if (error.request) {
+      Alert.alert("Network Error", "No response received from server.")
+    } else {
+      Alert.alert("Error", error.message || "Unexpected error")
+    }
   } finally {
     setIsReceiptLoading(false)
   }
 }
-
 
 
   const handleCreateAccount = (value: boolean) => {

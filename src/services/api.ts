@@ -127,11 +127,18 @@ export const apiRazorpayCallback = (data: any) => {
     return axiosInstance.post(`/api/razorpay/callback`, data);
 };
 
-export const apiGetReceipt = (data: any) => {
-    return axiosInstance.post(`/api/donations/receipt`, data, {
-        responseType: "blob",
-        headers: {
-            "Content-Type": "application/json",
-        },
-    });
-};
+// export const apiGetReceipt = (data: any) => {
+//     return axiosInstance.post(`/api/donations/receipt`, data, {
+//         responseType: "blob",
+//         headers: {
+//             "Content-Type": "application/json",
+//         },
+//     });
+// };
+
+export const apiGetReceipt = (data: any, config = {}) => {
+  return axiosInstance.post("/receipt", data, {
+    responseType: "arraybuffer", // important
+    ...config,
+  })
+}
