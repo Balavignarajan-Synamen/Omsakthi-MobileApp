@@ -137,7 +137,7 @@ export const apiRazorpayCallback = (data: any) => {
 // };
 
 export const apiGetReceipt = (data: any, config = {}) => {
-  return axiosInstance.post("/receipt", data, {
+  return axiosInstance.post("/api/donations/receipt", data, {
     responseType: "arraybuffer", // important
     ...config,
   })
